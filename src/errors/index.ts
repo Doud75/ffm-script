@@ -49,3 +49,14 @@ export class FFmpegError extends FfmScriptError {
     this.exitCode = exitCode;
   }
 }
+
+export class FFmpegTimeoutError extends FfmScriptError {
+  /** The timeout that was exceeded, in milliseconds. */
+  public readonly duration: number;
+
+  constructor(duration: number) {
+    super(`FFmpeg timed out after ${duration} ms and was terminated.`);
+    this.name = 'FFmpegTimeoutError';
+    this.duration = duration;
+  }
+}
