@@ -6,14 +6,19 @@ export class FfmScriptError extends Error {
 }
 
 export class FFmpegNotFoundError extends FfmScriptError {
-  constructor(binary: 'ffmpeg' | 'ffprobe' = 'ffmpeg') {
+  constructor(binary: 'ffmpeg' | 'ffprobe' = 'ffmpeg', invalidEnvPath?: string) {
     const envVar = binary === 'ffmpeg' ? 'FFMPEG_PATH' : 'FFPROBE_PATH';
+    const cause =
+      invalidEnvPath !== undefined
+        ? `${envVar} is set to "${invalidEnvPath}", but no executable was found there.`
+        : `"${binary}" was not found in your PATH.`;
     super(
-      `"${binary}" binary not found.\n` +
-        `Set the ${envVar} environment variable to its path, or install ffmpeg:\n` +
+      `${cause}\n` +
+        `Set ${envVar} to the binary's absolute path, or install FFmpeg:\n` +
         `  macOS:   brew install ffmpeg\n` +
         `  Ubuntu:  sudo apt-get install ffmpeg\n` +
-        `  Windows: winget install Gyan.FFmpeg`,
+        `  Windows: winget install Gyan.FFmpeg\n` +
+        `  Other:   https://ffmpeg.org/download.html`,
     );
     this.name = 'FFmpegNotFoundError';
   }
