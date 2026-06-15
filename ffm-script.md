@@ -38,7 +38,7 @@ Ce que la lib ne fait **pas** en v0.1 : HLS, chunked transcoding, support WebM/M
 - **Build** : tsup → dual ESM + CJS (`.js` / `.cjs`) avec types (`.d.ts` / `.d.cts`)
 - **Package manager** : pnpm
 - **Tests** : Jest + ts-jest en mode ESM
-- **Node.js** : >= 18
+- **Node.js** : >= 22
 - **Dépendances runtime** : aucune (zéro dep)
 - **Prérequis utilisateur** : avoir FFmpeg installé sur sa machine
 
@@ -176,12 +176,12 @@ ffm-scriptError (base)
 
 ### Epic 1 — Setup & infra
 
-| Ticket | Description | Effort |
-|--------|-------------|--------|
-| Init repo | pnpm init, tsconfig strict, tsup dual ESM+CJS, jest ESM | 2h |
+| Ticket | Description                                                   | Effort |
+|--------|---------------------------------------------------------------|--------|
+| Init repo | pnpm init, tsconfig strict, tsup dual ESM+CJS, jest ESM       | 2h |
 | binary.ts | Détection FFmpeg dans PATH ou FFMPEG_PATH, FFmpegNotFoundError | 3h |
 | spawn.ts | Wrapper child_process, progress parsing stderr, AbortSignal, FFmpegError | 4h |
-| CI GitHub Actions | Install FFmpeg sur runner, typecheck + test sur push, Node 18+20 | 2h |
+| CI GitHub Actions | Install FFmpeg sur runner, typecheck + test sur push, Node 22 | 2h |
 
 ### Epic 2 — Opérations core
 
