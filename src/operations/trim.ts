@@ -3,6 +3,7 @@ import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
 import { parseTimestamp } from '../core/time.js';
 import { validateInput } from '../core/validate.js';
+import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
 import { InvalidFormatError, InvalidOptionsError } from '../errors/index.js';
 import type { TrimOptions } from '../types/index.js';
 
@@ -29,7 +30,7 @@ export async function trim(
   output: string,
   options: TrimOptions,
 ): Promise<void> {
-  await validateInput(input, ['.mp4']);
+  await validateInput(input, VIDEO_INPUT_FORMATS);
   if (extname(output).toLowerCase() !== '.mp4') {
     throw new InvalidFormatError(output, 'output must be an .mp4 file');
   }

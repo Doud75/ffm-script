@@ -1,6 +1,7 @@
 import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
 import { validateInput } from '../core/validate.js';
+import { ALL_INPUT_FORMATS } from '../core/formats.js';
 import { InvalidFormatError } from '../errors/index.js';
 import type {
   AudioStream,
@@ -39,19 +40,20 @@ interface FfprobeFormat {
 /**
  * Reads media metadata from a file using `ffprobe`.
  *
- * Guaranteed input format in v0.1: MP4.
+ * Accepts any supported video or audio input format (MP4, MOV, WebM, MKV,
+ * MP3, AAC, WAV, FLAC, M4A).
  *
- * @param file - Path to the input MP4 file.
+ * @param file - Path to the input media file.
  * @returns Duration, size, bitrate, the list of streams, and the primary
  * video/audio streams (or `null` when absent).
  * @throws {FileNotFoundError} when the file does not exist.
- * @throws {InvalidFormatError} when the extension is not `.mp4` or ffprobe
+ * @throws {InvalidFormatError} when the extension is not supported or ffprobe
  * returns unparseable output.
  * @throws {FFmpegNotFoundError} when `ffprobe` cannot be located.
  * @throws {FFmpegError} when `ffprobe` exits with a non-zero code.
  */
 export async function probe(file: string): Promise<ProbeResult> {
-  await validateInput(file, ['.mp4']);
+  await validateInput(file, ALL_INPUT_FORMATS);
 
   const stdout = await spawnFFmpeg({
     binary: resolveBinary('ffprobe'),

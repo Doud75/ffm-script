@@ -2,6 +2,7 @@ import { extname } from 'node:path';
 import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
 import { validateInput } from '../core/validate.js';
+import { ALL_INPUT_FORMATS } from '../core/formats.js';
 import { InvalidFormatError, InvalidOptionsError } from '../errors/index.js';
 import type { ExtractAudioOptions } from '../types/index.js';
 
@@ -34,7 +35,7 @@ export async function extractAudio(
   output: string,
   options: ExtractAudioOptions = {},
 ): Promise<void> {
-  await validateInput(input, ['.mp4']);
+  await validateInput(input, ALL_INPUT_FORMATS);
 
   const ext = extname(output).toLowerCase();
   const codec = options.codec ?? inferCodec(ext);

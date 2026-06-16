@@ -2,6 +2,7 @@ import { extname } from 'node:path';
 import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
 import { validateInput } from '../core/validate.js';
+import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
 import { InvalidFormatError } from '../errors/index.js';
 import type { ConvertOptions } from '../types/index.js';
 import { probe } from './probe.js';
@@ -10,17 +11,17 @@ const DEFAULT_VIDEO_CODEC = 'libx264';
 const DEFAULT_AUDIO_CODEC = 'aac';
 
 /**
- * Transcodes an MP4 file to another MP4 file.
+ * Transcodes a video file (MP4/MOV/WebM/MKV) to an MP4 file.
  *
  * Sensible defaults are used when codecs are omitted (`libx264` / `aac`).
  * When `onProgress` is provided, the input is probed first to derive its
  * duration so progress can be reported as a percentage.
  *
- * @param input - Path to the source MP4 file.
+ * @param input - Path to the source video file.
  * @param output - Path to the destination MP4 file (overwritten if present).
  * @param options - Codec, bitrate, resolution and progress options.
  * @throws {FileNotFoundError} when `input` does not exist.
- * @throws {InvalidFormatError} when `input`/`output` is not an `.mp4` file.
+ * @throws {InvalidFormatError} when `input` is not a supported video format or `output` is not `.mp4`.
  * @throws {FFmpegNotFoundError} when `ffmpeg` cannot be located.
  * @throws {FFmpegError} when `ffmpeg` exits with a non-zero code.
  */
@@ -29,7 +30,7 @@ export async function convert(
   output: string,
   options: ConvertOptions = {},
 ): Promise<void> {
-  await validateInput(input, ['.mp4']);
+  await validateInput(input, VIDEO_INPUT_FORMATS);
   if (extname(output).toLowerCase() !== '.mp4') {
     throw new InvalidFormatError(output, 'output must be an .mp4 file');
   }
