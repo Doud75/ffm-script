@@ -42,6 +42,7 @@ export async function convert(
     args: buildArgs(input, output, options),
     ...(duration !== undefined ? { duration } : {}),
     ...(options.onProgress !== undefined ? { onProgress: options.onProgress } : {}),
+    ...(options.signal !== undefined ? { signal: options.signal } : {}),
   });
 }
 
