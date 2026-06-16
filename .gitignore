@@ -8,3 +8,7 @@ dist/
 # IDE
 .idea/
 .vscode/
+
+# Local design / planning doc (kept out of the repo)
+ffm-script.md
+ffm-script-design-doc.backup.md
