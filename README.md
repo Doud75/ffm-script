@@ -108,6 +108,23 @@ await thumbnail('input.mp4', 'thumb.jpg', {
 })
 ```
 
+### Package as HLS — `toHLS`
+
+```ts
+import { toHLS } from 'ffm-script'
+
+await toHLS('input.mp4', './output/', {
+  segmentDuration: 6,
+  resolutions: [
+    { width: 1920, bitrate: '5000k' },
+    { width: 1280, bitrate: '2500k' },
+    { width: 854,  bitrate: '1000k' },
+  ],
+  onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`),
+})
+// → output/master.m3u8 + output/1920/ + output/1280/ + output/854/
+```
+
 ## Progress
 
 `convert` and `trim` accept an `onProgress` callback. The percentage is parsed from FFmpeg's output against the known duration:

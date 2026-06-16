@@ -113,6 +113,28 @@ export interface ThumbnailOptions {
   signal?: AbortSignal;
 }
 
+/** A single quality variant in an HLS adaptive-bitrate ladder. */
+export interface HLSResolution {
+  /** Output width in pixels; height is scaled to preserve the aspect ratio. */
+  width: number;
+  /** Target video bitrate for this variant, e.g. `'2500k'`. */
+  bitrate: string;
+  /** Variant sub-folder name under the output directory; defaults to the width. */
+  name?: string;
+}
+
+/** Options for {@link toHLS}. */
+export interface HLSOptions {
+  /** One entry per quality variant (the adaptive-bitrate ladder). */
+  resolutions: HLSResolution[];
+  /** Segment length in seconds. Defaults to `6`. */
+  segmentDuration?: number;
+  /** Called with progress updates as the packaging advances. */
+  onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+}
+
 /** Progress information reported through an `onProgress` callback. */
 export interface Progress {
   /** Completion percentage, clamped to [0, 100]. */
