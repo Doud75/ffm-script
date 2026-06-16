@@ -9,6 +9,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - Additional input formats: video operations now accept MOV, WebM and MKV in addition to MP4; `probe` and `extractAudio` also accept audio-only inputs (MP3, AAC, WAV, FLAC, M4A). Video output remains MP4.
+- `toHLS(input, outputDir, options)`: package a video into adaptive-bitrate HLS — a `master.m3u8` plus one variant folder (playlist + `.ts` segments) per requested resolution, with configurable segment duration and progress/abort support.
 
 ## [0.1.1] - 2026-06-16
 
