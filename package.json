@@ -1,6 +1,6 @@
 {
   "name": "ffm-script",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Modern, TypeScript-native wrapper around the FFmpeg binary for common media operations (probe, convert, trim, extract audio, thumbnail).",
   "keywords": [
     "ffmpeg",
@@ -45,7 +45,10 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist", "CHANGELOG.md"],
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
