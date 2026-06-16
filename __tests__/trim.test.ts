@@ -1,29 +1,18 @@
-import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { trim } from '../src/operations/trim.js';
 import { probe } from '../src/operations/probe.js';
 import { FileNotFoundError, InvalidFormatError, InvalidOptionsError } from '../src/errors/index.js';
+import { SAMPLE } from './helpers.js';
 
 describe('trim', () => {
   let dir: string;
-  let input: string;
+  const input = SAMPLE;
 
   beforeAll(() => {
     dir = mkdtempSync(join(tmpdir(), 'ffm-trim-'));
-    input = join(dir, 'input.mp4');
-    // 10s source with a keyframe every second (-g 30 @ 30fps) so fast cuts stay tight.
-    execFileSync(
-      'ffmpeg',
-      [
-        '-f', 'lavfi', '-i', 'testsrc=size=320x240:rate=30:duration=10',
-        '-f', 'lavfi', '-i', 'sine=frequency=440:duration=10',
-        '-c:v', 'libx264', '-g', '30', '-c:a', 'aac', '-shortest', '-y', input,
-      ],
-      { stdio: 'ignore' },
-    );
-  }, 30_000);
+  });
 
   afterAll(() => {
     rmSync(dir, { recursive: true, force: true });

@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { thumbnail } from '../src/operations/thumbnail.js';
 import { FileNotFoundError, InvalidFormatError, InvalidOptionsError } from '../src/errors/index.js';
+import { SAMPLE } from './helpers.js';
 
 interface ImageStream {
   codec_name?: string;
@@ -24,20 +25,11 @@ function imageStream(file: string): ImageStream {
 
 describe('thumbnail', () => {
   let dir: string;
-  let input: string;
+  const input = SAMPLE;
 
   beforeAll(() => {
     dir = mkdtempSync(join(tmpdir(), 'ffm-thumb-'));
-    input = join(dir, 'input.mp4');
-    execFileSync(
-      'ffmpeg',
-      [
-        '-f', 'lavfi', '-i', 'testsrc=size=1280x720:rate=30:duration=3',
-        '-c:v', 'libx264', '-y', input,
-      ],
-      { stdio: 'ignore' },
-    );
-  }, 30_000);
+  });
 
   afterAll(() => {
     rmSync(dir, { recursive: true, force: true });
