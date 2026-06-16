@@ -1,28 +1,18 @@
-import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { convert } from '../src/operations/convert.js';
 import { probe } from '../src/operations/probe.js';
 import { FileNotFoundError, InvalidFormatError } from '../src/errors/index.js';
+import { SAMPLE } from './helpers.js';
 
 describe('convert', () => {
   let dir: string;
-  let input: string;
+  const input = SAMPLE;
 
   beforeAll(() => {
     dir = mkdtempSync(join(tmpdir(), 'ffm-convert-'));
-    input = join(dir, 'input.mp4');
-    execFileSync(
-      'ffmpeg',
-      [
-        '-f', 'lavfi', '-i', 'testsrc=size=1280x720:rate=30:duration=2',
-        '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
-        '-c:v', 'libx264', '-c:a', 'aac', '-shortest', '-y', input,
-      ],
-      { stdio: 'ignore' },
-    );
-  }, 30_000);
+  });
 
   afterAll(() => {
     rmSync(dir, { recursive: true, force: true });

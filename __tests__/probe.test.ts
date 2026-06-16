@@ -1,28 +1,17 @@
-import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { probe } from '../src/operations/probe.js';
 import { FileNotFoundError, InvalidFormatError } from '../src/errors/index.js';
+import { SAMPLE } from './helpers.js';
 
 describe('probe', () => {
   let dir: string;
-  let sample: string;
+  const sample = SAMPLE;
 
   beforeAll(() => {
     dir = mkdtempSync(join(tmpdir(), 'ffm-probe-'));
-    sample = join(dir, 'sample.mp4');
-    // 2s 1280x720@30 h264 video + 440Hz aac audio.
-    execFileSync(
-      'ffmpeg',
-      [
-        '-f', 'lavfi', '-i', 'testsrc=size=1280x720:rate=30:duration=2',
-        '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
-        '-c:v', 'libx264', '-c:a', 'aac', '-shortest', '-y', sample,
-      ],
-      { stdio: 'ignore' },
-    );
-  }, 30_000);
+  });
 
   afterAll(() => {
     rmSync(dir, { recursive: true, force: true });
@@ -30,7 +19,7 @@ describe('probe', () => {
 
   it('reads format-level metadata', async () => {
     const info = await probe(sample);
-    expect(info.duration).toBeCloseTo(2, 0);
+    expect(info.duration).toBeCloseTo(10, 0);
     expect(info.size).toBeGreaterThan(0);
     expect(info.bitrate).toBeGreaterThan(0);
     expect(info.streams).toHaveLength(2);
