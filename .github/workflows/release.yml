@@ -1,0 +1,49 @@
+name: Release
+
+# Publishes to npm when a version tag is pushed (e.g. `git push --follow-tags`
+# after `npm version`). The package is never published from a local machine.
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # required for npm provenance
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Test
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
