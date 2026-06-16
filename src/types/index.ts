@@ -38,6 +38,8 @@ export interface ConvertOptions {
   width?: number;
   height?: number;
   onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
 }
 
 export interface TrimOptions {
@@ -53,17 +55,23 @@ export interface TrimOptions {
    */
   mode?: 'fast' | 'precise';
   onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
 }
 
 export interface ExtractAudioOptions {
   codec?: 'mp3' | 'aac';
   bitrate?: string;
   sampleRate?: number;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
 }
 
 export interface ThumbnailOptions {
   timestamp: number | string;
   width?: number;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
 }
 
 export interface Progress {

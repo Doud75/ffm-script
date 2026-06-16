@@ -65,4 +65,13 @@ describe('convert', () => {
   it('throws InvalidFormatError when the output is not an .mp4', async () => {
     await expect(convert(input, join(dir, 'out.mkv'))).rejects.toBeInstanceOf(InvalidFormatError);
   });
+
+  it('rejects with an AbortError when the signal is aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      convert(input, join(dir, 'aborted.mp4'), { signal: controller.signal }),
+    ).rejects.toMatchObject({ name: 'AbortError' });
+  });
 });
