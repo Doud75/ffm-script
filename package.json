@@ -1,6 +1,6 @@
 {
   "name": "ffm-script",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Modern, TypeScript-native wrapper around the FFmpeg binary for common media operations (probe, convert, trim, extract audio, thumbnail).",
   "keywords": [
     "ffmpeg",
