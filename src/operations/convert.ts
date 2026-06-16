@@ -3,6 +3,7 @@ import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
 import { validateInput } from '../core/validate.js';
 import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
+import { buildScaleFilter } from '../core/scale.js';
 import { InvalidFormatError } from '../errors/index.js';
 import type { ConvertOptions } from '../types/index.js';
 import { probe } from './probe.js';
@@ -56,21 +57,10 @@ function buildArgs(input: string, output: string, options: ConvertOptions): stri
   if (options.videoBitrate !== undefined) args.push('-b:v', options.videoBitrate);
   if (options.audioBitrate !== undefined) args.push('-b:a', options.audioBitrate);
 
-  const scale = buildScale(options.width, options.height);
+  const scale = buildScaleFilter(options.width, options.height);
   if (scale !== undefined) args.push('-vf', scale);
 
   // Overwrite the output without prompting on stdin.
   args.push('-y', output);
   return args;
-}
-
-/**
- * Builds an FFmpeg `scale` filter value. A `-2` placeholder lets FFmpeg
- * preserve the aspect ratio while keeping the dimension even (required by h264).
- */
-function buildScale(width: number | undefined, height: number | undefined): string | undefined {
-  if (width !== undefined && height !== undefined) return `scale=${width}:${height}`;
-  if (width !== undefined) return `scale=${width}:-2`;
-  if (height !== undefined) return `scale=-2:${height}`;
-  return undefined;
 }

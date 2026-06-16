@@ -125,6 +125,19 @@ await toHLS('input.mp4', './output/', {
 // → output/master.m3u8 + output/1920/ + output/1280/ + output/854/
 ```
 
+### Chainable API — `ffmscript`
+
+Fuse `trim` and `convert` into a **single** FFmpeg pass (not separate processes):
+
+```ts
+import { ffmscript } from 'ffm-script'
+
+await ffmscript('input.mp4')
+  .trim({ start: 60, end: 180 })
+  .convert({ width: 1280 })
+  .save('output.mp4', { onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`) })
+```
+
 ## Progress
 
 `convert` and `trim` accept an `onProgress` callback. The percentage is parsed from FFmpeg's output against the known duration:
