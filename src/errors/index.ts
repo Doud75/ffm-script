@@ -38,6 +38,13 @@ export class InvalidFormatError extends FfmScriptError {
   }
 }
 
+export class InvalidOptionsError extends FfmScriptError {
+  constructor(reason: string) {
+    super(`Invalid options: ${reason}`);
+    this.name = 'InvalidOptionsError';
+  }
+}
+
 export class FFmpegError extends FfmScriptError {
   public readonly stderr: string;
   public readonly exitCode: number;
