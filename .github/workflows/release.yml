@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # required for npm provenance
+      id-token: write # required for npm Trusted Publishing (OIDC) + provenance
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -25,6 +25,10 @@ jobs:
           node-version: 22
           cache: pnpm
           registry-url: https://registry.npmjs.org
+
+      # Trusted Publishing via OIDC requires npm >= 11.5.1.
+      - name: Update npm
+        run: npm install -g npm@latest
 
       - name: Install FFmpeg
         run: |
@@ -43,7 +47,7 @@ jobs:
       - name: Build
         run: pnpm build
 
+      # No token needed: authentication is via OIDC (Trusted Publishing).
+      # Configure the trusted publisher for this package on npmjs.com first.
       - name: Publish to npm
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
