@@ -34,7 +34,7 @@ pnpm add ffm-script
 # or: npm install ffm-script / yarn add ffm-script
 ```
 
-> **Supported formats in v0.1:** MP4 in and out (audio extraction targets MP3/AAC, thumbnails target JPEG/PNG).
+> **Formats:** input MP4 / MOV / WebM / MKV (plus MP3 / AAC / WAV / FLAC / M4A for audio); video output is MP4. Audio extraction targets MP3/AAC; thumbnails target JPEG/PNG.
 
 ## Usage
 
