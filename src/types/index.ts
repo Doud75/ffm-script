@@ -10,6 +10,8 @@ export interface VideoStream extends Stream {
   height: number;
   fps: number;
   bitrate: number;
+  /** Display rotation in degrees clockwise, normalized to [0, 360). */
+  rotation: number;
 }
 
 export interface AudioStream extends Stream {
