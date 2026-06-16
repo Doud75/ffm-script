@@ -1,0 +1,24 @@
+# Changelog
+
+All notable changes to this project are documented here. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
+to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.1.0] - 2026-06-16
+
+Initial release. Guaranteed format: MP4 in and out.
+
+### Added
+
+- `probe(file)` — read media metadata (duration, size, bitrate, streams, video/audio details, rotation) via ffprobe.
+- `convert(input, output, options)` — MP4 → MP4 transcode with codec, bitrate and resolution options (defaults: `libx264` / `aac`).
+- `trim(input, output, options)` — cut a section with `fast` (stream copy, keyframe-bound) or `precise` (re-encode, frame-accurate) modes.
+- `extractAudio(input, output, options)` — extract the audio track to MP3 or AAC, with bitrate and sample-rate options.
+- `thumbnail(input, output, options)` — capture a single frame to JPEG or PNG, with optional resize width.
+- `checkDependencies()` — eagerly verify that `ffmpeg` and `ffprobe` are available.
+- `onProgress` callbacks on `convert` and `trim`, and `AbortSignal` cancellation on every operation.
+- Typed error hierarchy: `FfmScriptError`, `FFmpegNotFoundError`, `FileNotFoundError`, `InvalidFormatError`, `InvalidOptionsError`, `FFmpegError`, `FFmpegTimeoutError`.
+- Input validation (file existence, extension, timestamps) before any FFmpeg call.
+- Dual ESM + CJS builds with TypeScript declarations.
+
+[0.1.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.1.0

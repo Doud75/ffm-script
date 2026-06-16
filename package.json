@@ -1,6 +1,30 @@
 {
   "name": "ffm-script",
   "version": "0.1.0",
+  "description": "Modern, TypeScript-native wrapper around the FFmpeg binary for common media operations (probe, convert, trim, extract audio, thumbnail).",
+  "keywords": [
+    "ffmpeg",
+    "ffprobe",
+    "video",
+    "audio",
+    "media",
+    "transcode",
+    "convert",
+    "trim",
+    "thumbnail",
+    "mp4",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "Adrien Quimbre",
+  "homepage": "https://github.com/Doud75/ffm-script#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Doud75/ffm-script.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Doud75/ffm-script/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -21,7 +45,7 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": ["dist"],
+  "files": ["dist", "CHANGELOG.md"],
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
