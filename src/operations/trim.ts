@@ -1,6 +1,7 @@
 import { extname } from 'node:path';
 import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
+import { parseTimestamp } from '../core/time.js';
 import { validateInput } from '../core/validate.js';
 import { InvalidFormatError, InvalidOptionsError } from '../errors/index.js';
 import type { TrimOptions } from '../types/index.js';
@@ -33,8 +34,8 @@ export async function trim(
     throw new InvalidFormatError(output, 'output must be an .mp4 file');
   }
 
-  const start = toSeconds(options.start, 'start');
-  const end = toSeconds(options.end, 'end');
+  const start = parseTimestamp(options.start, 'start');
+  const end = parseTimestamp(options.end, 'end');
   if (start < 0) {
     throw new InvalidOptionsError(`trim start must be >= 0 (got ${start}s)`);
   }
@@ -66,23 +67,4 @@ export async function trim(
     ...(options.onProgress !== undefined ? { onProgress: options.onProgress } : {}),
     ...(options.signal !== undefined ? { signal: options.signal } : {}),
   });
-}
-
-/** Parses a timestamp (seconds or `HH:MM:SS[.ms]`) into seconds. */
-function toSeconds(value: number | string, label: string): number {
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new InvalidOptionsError(`invalid ${label} timestamp: ${value}`);
-    return value;
-  }
-
-  const parts = value.split(':');
-  let seconds = 0;
-  for (const part of parts) {
-    const n = Number(part);
-    if (part === '' || Number.isNaN(n)) {
-      throw new InvalidOptionsError(`invalid ${label} timestamp: "${value}"`);
-    }
-    seconds = seconds * 60 + n;
-  }
-  return seconds;
 }
