@@ -13,6 +13,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `parallelConvert`: long videos are now split into **more, shorter chunks than there are workers** and processed through a bounded worker pool, so a slow chunk no longer leaves other workers idle — better load balancing on uneven content. Chunk count is bounded to keep chunks a sensible minimum length. The `planSegments` building block's option was renamed `workerCount` → `segmentCount` to match.
 - `parallelConvert`: audio is now encoded in a **single continuous pass** and muxed back onto the concatenated video, instead of being re-encoded inside each chunk. This removes the per-junction AAC priming that accumulated audio drift and an A/V start offset — joins are now seamless regardless of the number of chunks/workers. Inputs without an audio track are handled too.
 - `parallelConvert`: `workers` now defaults to **half** the host's logical CPU cores (at least 1) instead of all of them, keeping the machine usable during the transcode and avoiding CPU oversubscription (each FFmpeg worker is already multithreaded). A `workers` value above the core count is now capped to it.
 
