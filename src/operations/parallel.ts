@@ -64,18 +64,33 @@ export async function parallelConvert(
 
   const keyframes = await resolveKeyframes(input);
   const segments = planSegments(keyframes, { workerCount: workers });
-  const { duration: totalDuration } = await probe(input);
+  const { duration: totalDuration, audio } = await probe(input);
 
   const workDir = await mkdtemp(join(tmpdir(), 'ffm-parallel-'));
   try {
-    const chunks = await transcodeSegments(input, segments, workDir, totalDuration, options);
-    await concatChunks(chunks, workDir, output, options.signal);
+    // The audio is encoded as a single continuous pass and muxed back at the end.
+    // Splitting audio across the chunks would re-prime the AAC encoder at every
+    // junction, accumulating gaps/drift and an A/V offset. Keeping it whole makes
+    // the joins seamless regardless of how many chunks the video is cut into.
+    const audioTrack = audio !== null ? join(workDir, 'audio.m4a') : undefined;
+    const videoTarget = audioTrack === undefined ? output : join(workDir, 'video.mp4');
+
+    await Promise.all([
+      transcodeSegments(input, segments, workDir, totalDuration, options).then((chunks) =>
+        concatChunks(chunks, workDir, videoTarget, options.signal),
+      ),
+      audioTrack !== undefined ? encodeAudio(input, audioTrack, options.signal) : Promise.resolve(),
+    ]);
+
+    if (audioTrack !== undefined) {
+      await muxAudioVideo(videoTarget, audioTrack, output, options.signal);
+    }
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
 }
 
-/** Re-encodes every segment in parallel; returns chunk paths in output order. */
+/** Re-encodes the video of every segment in parallel; returns chunk paths in output order. */
 async function transcodeSegments(
   input: string,
   segments: Segment[],
@@ -101,11 +116,12 @@ async function transcodeSegments(
       chunks[seg.index] = chunk;
 
       const chunkDuration = seg.endTime !== undefined ? seg.endTime - seg.startTime : totalDuration - seg.startTime;
+      // Video-only chunk (-an): audio is handled separately, in one pass.
       const args = ['-ss', String(seg.startTime), '-i', input];
       if (seg.endTime !== undefined) args.push('-t', String(chunkDuration));
-      args.push('-c:v', 'libx264');
+      args.push('-an', '-c:v', 'libx264');
       if (options.targetBitrate !== undefined) args.push('-b:v', options.targetBitrate);
-      args.push('-c:a', 'aac', '-y', chunk);
+      args.push('-y', chunk);
 
       await spawnFFmpeg({
         binary,
@@ -135,6 +151,33 @@ async function concatChunks(
   await spawnFFmpeg({
     binary: resolveBinary('ffmpeg'),
     args: ['-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', '-y', output],
+    ...(signal !== undefined ? { signal } : {}),
+  });
+}
+
+/** Encodes the whole audio track in a single pass (no junctions → no drift). */
+async function encodeAudio(
+  input: string,
+  output: string,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  await spawnFFmpeg({
+    binary: resolveBinary('ffmpeg'),
+    args: ['-i', input, '-vn', '-c:a', 'aac', '-y', output],
+    ...(signal !== undefined ? { signal } : {}),
+  });
+}
+
+/** Muxes the concatenated video with the single-pass audio (no re-encode). */
+async function muxAudioVideo(
+  video: string,
+  audio: string,
+  output: string,
+  signal: AbortSignal | undefined,
+): Promise<void> {
+  await spawnFFmpeg({
+    binary: resolveBinary('ffmpeg'),
+    args: ['-i', video, '-i', audio, '-map', '0:v:0', '-map', '1:a:0', '-c', 'copy', '-y', output],
     ...(signal !== undefined ? { signal } : {}),
   });
 }
