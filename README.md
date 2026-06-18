@@ -152,6 +152,8 @@ await parallelConvert('input.mp4', 'output.mp4', {
 })
 ```
 
+`workers` is optional. It defaults to **half the host's logical cores** (at least 1) so the machine stays usable during the transcode — each FFmpeg worker is itself multithreaded, so one worker per core would oversubscribe the CPU. A value above the core count is capped to it.
+
 ## Progress
 
 `convert` and `trim` accept an `onProgress` callback. The percentage is parsed from FFmpeg's output against the known duration:

@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parallelConvert } from '../src/operations/parallel.js';
+import { parallelConvert, resolveWorkers } from '../src/operations/parallel.js';
 import { planSegments } from '../src/core/segments.js';
 import { probe } from '../src/operations/probe.js';
 import { FileNotFoundError, InvalidFormatError, InvalidOptionsError } from '../src/errors/index.js';
@@ -24,6 +24,30 @@ describe('planSegments', () => {
   it('never produces more segments than keyframes', () => {
     expect(planSegments([{ timestamp: 0 }], { workerCount: 8 })).toHaveLength(1);
     expect(planSegments([], { workerCount: 4 })).toHaveLength(0);
+  });
+});
+
+describe('resolveWorkers', () => {
+  it('defaults to half the logical cores (at least 1)', () => {
+    expect(resolveWorkers(undefined, 8)).toBe(4);
+    expect(resolveWorkers(undefined, 16)).toBe(8);
+    expect(resolveWorkers(undefined, 1)).toBe(1); // single-core host still gets one worker
+    expect(resolveWorkers(undefined, 3)).toBe(1); // floor(3/2)
+  });
+
+  it('keeps a requested count within the core budget', () => {
+    expect(resolveWorkers(3, 8)).toBe(3);
+    expect(resolveWorkers(8, 8)).toBe(8);
+  });
+
+  it('caps a requested count at the core count to avoid oversubscription', () => {
+    expect(resolveWorkers(32, 8)).toBe(8);
+  });
+
+  it('throws InvalidOptionsError for a non-positive or non-integer count', () => {
+    expect(() => resolveWorkers(0, 8)).toThrow(InvalidOptionsError);
+    expect(() => resolveWorkers(-2, 8)).toThrow(InvalidOptionsError);
+    expect(() => resolveWorkers(2.5, 8)).toThrow(InvalidOptionsError);
   });
 });
 
