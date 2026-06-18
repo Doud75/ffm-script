@@ -15,16 +15,16 @@ export interface Segment {
  * boundaries fall exactly on keyframes, so each chunk can be decoded
  * independently and re-joined without artefacts.
  *
- * Produces at most `workerCount` segments (capped by the keyframe count).
+ * Produces at most `segmentCount` segments (capped by the keyframe count).
  */
 export function planSegments(
   keyframes: Keyframe[],
-  options: { workerCount: number },
+  options: { segmentCount: number },
 ): Segment[] {
   if (keyframes.length === 0) return [];
 
-  const workerCount = Math.max(1, Math.floor(options.workerCount));
-  const segmentCount = Math.min(workerCount, keyframes.length);
+  const requested = Math.max(1, Math.floor(options.segmentCount));
+  const segmentCount = Math.min(requested, keyframes.length);
 
   // Pick evenly-spaced keyframe indices as segment starts (deduped).
   const startIndices = [
