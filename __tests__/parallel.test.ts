@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -76,6 +77,19 @@ describe('parallelConvert', () => {
     expect(info.duration).toBeCloseTo(10, 0); // full length preserved across joins
     expect(percents.length).toBeGreaterThan(0);
     expect(Math.max(...percents)).toBeLessThanOrEqual(100);
+  }, 60_000);
+
+  it('falls back to frame-boundary cuts for an all-intra input (no stss box)', async () => {
+    const allIntra = join(dir, 'allintra.mp4');
+    // -g 1 makes every frame a keyframe; the muxer omits the stss box.
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-g', '1', '-c:a', 'aac', allIntra]);
+
+    const output = join(dir, 'out-allintra.mp4');
+    await parallelConvert(allIntra, output, { workers: 4, targetBitrate: '800k' });
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.duration).toBeCloseTo(10, 0);
   }, 60_000);
 
   it('throws InvalidOptionsError for a non-positive worker count', async () => {

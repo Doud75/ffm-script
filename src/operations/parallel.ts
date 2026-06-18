@@ -42,7 +42,7 @@ export function resolveWorkers(requested: number | undefined, cpuCount: number):
  * @param output - Path to the destination MP4 file.
  * @param options - Worker count, target bitrate, and progress/abort options.
  * @throws {FileNotFoundError} when `input` does not exist.
- * @throws {InvalidFormatError} when `input`/`output` is not MP4, or the input has no keyframe index.
+ * @throws {InvalidFormatError} when `input`/`output` is not MP4, or the input has no video track.
  * @throws {InvalidOptionsError} when `workers` is not a positive integer.
  * @throws {FFmpegError} when any FFmpeg process exits non-zero.
  */

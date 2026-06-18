@@ -10,8 +10,12 @@ import type { Keyframe } from '../types/index.js';
  * (sync samples) with `stts` (sample durations) and the media timescale to turn
  * sample numbers into timestamps in seconds.
  *
- * @throws {InvalidFormatError} when the file has no `moov`, no video track, or
- * no `stss` box (e.g. an all-intra stream where every frame is a keyframe).
+ * When the `stss` box is absent, the ISOBMFF spec says every sample is a sync
+ * sample — an all-intra stream where each frame is independently decodable.
+ * In that case every frame is returned as a keyframe, so callers can still cut
+ * on frame boundaries anywhere.
+ *
+ * @throws {InvalidFormatError} when the file has no `moov` or no video track.
  */
 export async function extractKeyframeIndex(path: string): Promise<Keyframe[]> {
   const moov = await readMoovPayload(path);
@@ -34,16 +38,19 @@ export async function extractKeyframeIndex(path: string): Promise<Keyframe[]> {
     const stts = findBox(dv, stbl.start, stbl.end, 'stts');
     const stss = findBox(dv, stbl.start, stbl.end, 'stss');
     if (stts === undefined) continue;
-    if (stss === undefined) {
-      throw new InvalidFormatError(path, 'no stss box: stream has no keyframe index (all-intra?)');
-    }
 
     const timescale = readTimescale(dv, mdhd);
-    const times = sampleStartTimes(readStts(dv, stts), readStss(dv, stss), timescale);
+    const runs = readStts(dv, stts);
+
+    // No stss → all-intra by spec: every sample is a sync sample. Return them all.
+    const times =
+      stss === undefined
+        ? allSampleStartTimes(runs, timescale)
+        : sampleStartTimes(runs, readStss(dv, stss), timescale);
     return times.map((timestamp) => ({ timestamp }));
   }
 
-  throw new InvalidFormatError(path, 'no video track with a keyframe index found');
+  throw new InvalidFormatError(path, 'no video track found');
 }
 
 interface Box {
@@ -146,6 +153,22 @@ function sampleStartTimes(stts: SttsRun[], samples: number[], timescale: number)
     }
     const time = run === undefined ? runFirstTime : runFirstTime + (sample - runFirstSample) * run.delta;
     out.push(timescale > 0 ? time / timescale : 0);
+  }
+  return out;
+}
+
+/**
+ * Start time (in seconds) of every sample, walking the run-length `stts` table.
+ * Used for all-intra streams where each frame is a sync sample.
+ */
+function allSampleStartTimes(stts: SttsRun[], timescale: number): number[] {
+  const out: number[] = [];
+  let time = 0;
+  for (const run of stts) {
+    for (let i = 0; i < run.count; i++) {
+      out.push(timescale > 0 ? time / timescale : 0);
+      time += run.delta;
+    }
   }
   return out;
 }
