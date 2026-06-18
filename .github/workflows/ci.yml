@@ -44,9 +44,18 @@ jobs:
           cache: pnpm
 
       - name: Install FFmpeg
+        # Official Ubuntu package, minus the Recommends (VA/VDPAU drivers, SDL,
+        # PulseAudio, ...) we don't need for headless transcoding — that trims the
+        # download from ~94 MB / 99 packages to the codec libs only. Retried to
+        # ride out transient apt mirror hiccups.
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          for attempt in 1 2 3; do
+            sudo apt-get update && \
+            sudo apt-get install -y --no-install-recommends ffmpeg && break
+            echo "::warning::apt-get failed (attempt $attempt), retrying in 10s"
+            sleep 10
+          done
+          ffmpeg -version && ffprobe -version
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
