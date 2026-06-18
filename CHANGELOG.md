@@ -6,6 +6,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `parallelConvert` now handles **all-intra** MP4 inputs (no `stss` box). Per the ISOBMFF spec an absent `stss` means every frame is a sync sample, so every frame is treated as a keyframe and segmentation cuts on any frame boundary — instead of failing with `InvalidFormatError`.
+
 ### Changed
 
 - `parallelConvert`: `workers` now defaults to **half** the host's logical CPU cores (at least 1) instead of all of them, keeping the machine usable during the transcode and avoiding CPU oversubscription (each FFmpeg worker is already multithreaded). A `workers` value above the core count is now capped to it.
