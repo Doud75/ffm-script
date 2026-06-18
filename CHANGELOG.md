@@ -8,6 +8,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `parallelConvert` now accepts **MOV, WebM and MKV** inputs in addition to MP4 (output stays MP4). Keyframes are read from the ISOBMFF `stss` box for MP4/MOV, and re-indexed via ffprobe packet flags for Matroska/WebM (or any ISOBMFF the binary parser can't handle). Exposes the new building block `resolveKeyframes`.
 - `parallelConvert` now handles **all-intra** MP4 inputs (no `stss` box). Per the ISOBMFF spec an absent `stss` means every frame is a sync sample, so every frame is treated as a keyframe and segmentation cuts on any frame boundary — instead of failing with `InvalidFormatError`.
 
 ### Changed
