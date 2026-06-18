@@ -34,6 +34,22 @@ export function resolveWorkers(requested: number | undefined, cpuCount: number):
   return Math.min(requested, cpuCount);
 }
 
+/** Extra segments per worker, so a slow chunk can't leave the pool idle. */
+const SEGMENTS_PER_WORKER = 3;
+/** Don't carve chunks shorter than this — sub-chunk encoder warm-up isn't worth it. */
+const MIN_CHUNK_SECONDS = 5;
+
+/**
+ * Decides how many segments to cut the timeline into. More segments than workers
+ * lets the bounded pool rebalance — when one chunk runs long, idle workers pick up
+ * the remaining shorter chunks instead of waiting. Bounded so chunks stay at least
+ * {@link MIN_CHUNK_SECONDS} long, and never more than the available keyframes.
+ */
+export function planSegmentCount(workers: number, totalDuration: number, keyframeCount: number): number {
+  const maxByMinChunk = Math.max(workers, Math.floor(totalDuration / MIN_CHUNK_SECONDS));
+  return Math.min(workers * SEGMENTS_PER_WORKER, maxByMinChunk, keyframeCount);
+}
+
 /**
  * Transcodes a video by splitting it on keyframe boundaries, re-encoding the
  * chunks in parallel (one FFmpeg worker each), then concatenating them without
@@ -63,8 +79,10 @@ export async function parallelConvert(
   const workers = resolveWorkers(options.workers, cpus().length);
 
   const keyframes = await resolveKeyframes(input);
-  const segments = planSegments(keyframes, { workerCount: workers });
   const { duration: totalDuration, audio } = await probe(input);
+  const segments = planSegments(keyframes, {
+    segmentCount: planSegmentCount(workers, totalDuration, keyframes.length),
+  });
 
   const workDir = await mkdtemp(join(tmpdir(), 'ffm-parallel-'));
   try {
@@ -76,7 +94,7 @@ export async function parallelConvert(
     const videoTarget = audioTrack === undefined ? output : join(workDir, 'video.mp4');
 
     await Promise.all([
-      transcodeSegments(input, segments, workDir, totalDuration, options).then((chunks) =>
+      transcodeSegments(input, segments, workDir, totalDuration, workers, options).then((chunks) =>
         concatChunks(chunks, workDir, videoTarget, options.signal),
       ),
       audioTrack !== undefined ? encodeAudio(input, audioTrack, options.signal) : Promise.resolve(),
@@ -90,52 +108,76 @@ export async function parallelConvert(
   }
 }
 
-/** Re-encodes the video of every segment in parallel; returns chunk paths in output order. */
+/**
+ * Re-encodes the video of every segment, running at most `concurrency` workers at
+ * once. There are usually more segments than workers, so the pool rebalances:
+ * whenever a worker finishes a chunk it picks up the next one.
+ *
+ * Returns chunk paths in output order.
+ */
 async function transcodeSegments(
   input: string,
   segments: Segment[],
   workDir: string,
   totalDuration: number,
+  concurrency: number,
   options: ParallelConvertOptions,
 ): Promise<string[]> {
   const binary = resolveBinary('ffmpeg');
   const chunks: string[] = [];
-  const processedByWorker = new Array<number>(segments.length).fill(0);
+  const processedBySegment = new Array<number>(segments.length).fill(0);
 
   const reportAggregate = (index: number, currentTime: number): void => {
     if (options.onProgress === undefined) return;
-    processedByWorker[index] = currentTime;
-    const processed = processedByWorker.reduce((a, b) => a + b, 0);
+    processedBySegment[index] = currentTime;
+    const processed = processedBySegment.reduce((a, b) => a + b, 0);
     const percent = totalDuration > 0 ? Math.min(100, (processed / totalDuration) * 100) : 0;
     options.onProgress({ percent, currentTime: processed, totalTime: totalDuration });
   };
 
-  await Promise.all(
-    segments.map(async (seg) => {
-      const chunk = join(workDir, `chunk_${String(seg.index).padStart(4, '0')}.mp4`);
-      chunks[seg.index] = chunk;
+  await runPool(segments, concurrency, async (seg) => {
+    const chunk = join(workDir, `chunk_${String(seg.index).padStart(4, '0')}.mp4`);
+    chunks[seg.index] = chunk;
 
-      const chunkDuration = seg.endTime !== undefined ? seg.endTime - seg.startTime : totalDuration - seg.startTime;
-      // Video-only chunk (-an): audio is handled separately, in one pass.
-      const args = ['-ss', String(seg.startTime), '-i', input];
-      if (seg.endTime !== undefined) args.push('-t', String(chunkDuration));
-      args.push('-an', '-c:v', 'libx264');
-      if (options.targetBitrate !== undefined) args.push('-b:v', options.targetBitrate);
-      args.push('-y', chunk);
+    const chunkDuration = seg.endTime !== undefined ? seg.endTime - seg.startTime : totalDuration - seg.startTime;
+    // Video-only chunk (-an): audio is handled separately, in one pass.
+    const args = ['-ss', String(seg.startTime), '-i', input];
+    if (seg.endTime !== undefined) args.push('-t', String(chunkDuration));
+    args.push('-an', '-c:v', 'libx264');
+    if (options.targetBitrate !== undefined) args.push('-b:v', options.targetBitrate);
+    args.push('-y', chunk);
 
-      await spawnFFmpeg({
-        binary,
-        args,
-        duration: chunkDuration,
-        ...(options.onProgress !== undefined
-          ? { onProgress: (p) => reportAggregate(seg.index, p.currentTime) }
-          : {}),
-        ...(options.signal !== undefined ? { signal: options.signal } : {}),
-      });
-    }),
-  );
+    await spawnFFmpeg({
+      binary,
+      args,
+      duration: chunkDuration,
+      ...(options.onProgress !== undefined
+        ? { onProgress: (p) => reportAggregate(seg.index, p.currentTime) }
+        : {}),
+      ...(options.signal !== undefined ? { signal: options.signal } : {}),
+    });
+  });
 
   return chunks;
+}
+
+/**
+ * Runs `task` over `items` with at most `concurrency` in flight at once. Each lane
+ * pulls the next item as soon as it is free, so longer tasks don't stall the rest.
+ */
+async function runPool<T>(
+  items: T[],
+  concurrency: number,
+  task: (item: T) => Promise<void>,
+): Promise<void> {
+  let next = 0;
+  const lanes = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (next < items.length) {
+      const index = next++;
+      await task(items[index]!);
+    }
+  });
+  await Promise.all(lanes);
 }
 
 /** Joins the chunks with the concat demuxer (no re-encode). */
