@@ -44,16 +44,18 @@ jobs:
           cache: pnpm
 
       - name: Install FFmpeg
-        # Official Ubuntu package, minus the Recommends (VA/VDPAU drivers, SDL,
-        # PulseAudio, ...) we don't need for headless transcoding — that trims the
-        # download from ~94 MB / 99 packages to the codec libs only. Retried to
-        # ride out transient apt mirror hiccups.
+        # GitHub's Ubuntu runners default to azure.archive.ubuntu.com, a chronically
+        # flaky mirror (actions/runner-images#7048, #6486). Repoint apt at the
+        # canonical archive.ubuntu.com — same official Ubuntu package, reliable
+        # source. Noble keeps its sources in deb822 sources.list.d/ubuntu.sources.
+        # --no-install-recommends drops the VA/VDPAU drivers, SDL, PulseAudio, ...
+        # we don't need for headless transcoding (~94 MB → codec libs only).
         run: |
+          sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' \
+            /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list 2>/dev/null || true
           for attempt in 1 2 3; do
-            sudo apt-get update && \
-            sudo apt-get install -y --no-install-recommends ffmpeg && break
-            echo "::warning::apt-get failed (attempt $attempt), retrying in 10s"
-            sleep 10
+            sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg && break
+            echo "::warning::apt failed (attempt $attempt), retrying in 5s"; sleep 5
           done
           ffmpeg -version && ffprobe -version
 
