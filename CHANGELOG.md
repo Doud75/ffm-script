@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-18
+
+### Added
+
+- `parallelConvert(input, output, options)`: keyframe-aware parallel transcoding — splits the MP4 on keyframe boundaries (parsed directly from the `stss` box), re-encodes the chunks across N workers, then concatenates them without re-encoding (artefact-free joins). Also exposes the building blocks `extractKeyframeIndex` and `planSegments`.
+
 ## [0.2.0] - 2026-06-16
 
 ### Added
@@ -35,6 +41,7 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
-[Unreleased]: https://github.com/Doud75/ffm-script/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Doud75/ffm-script/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.2.0
 [0.1.1]: https://github.com/Doud75/ffm-script/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.1.0

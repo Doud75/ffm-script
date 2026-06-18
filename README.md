@@ -138,6 +138,20 @@ await ffmscript('input.mp4')
   .save('output.mp4', { onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`) })
 ```
 
+### Parallel transcode — `parallelConvert`
+
+Splits the MP4 on keyframe boundaries, re-encodes the chunks across N workers, then joins them without re-encoding (artefact-free):
+
+```ts
+import { parallelConvert } from 'ffm-script'
+
+await parallelConvert('input.mp4', 'output.mp4', {
+  workers: 4,
+  targetBitrate: '2000k',
+  onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`),
+})
+```
+
 ## Progress
 
 `convert` and `trim` accept an `onProgress` callback. The percentage is parsed from FFmpeg's output against the known duration:
