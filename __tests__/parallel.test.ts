@@ -92,6 +92,47 @@ describe('parallelConvert', () => {
     expect(info.duration).toBeCloseTo(10, 0);
   }, 60_000);
 
+  it('keeps audio and video aligned at the junctions (no drift, no A/V offset)', async () => {
+    const output = join(dir, 'out-continuity.mp4');
+    // Many workers → many junctions: any drift or desync would accumulate here.
+    await parallelConvert(SAMPLE, output, { workers: 6, targetBitrate: '800k' });
+
+    const streams = (
+      JSON.parse(
+        execFileSync('ffprobe', [
+          '-v', 'error',
+          '-show_entries', 'stream=codec_type,start_time,duration',
+          '-of', 'json',
+          output,
+        ]).toString(),
+      ) as { streams: { codec_type: string; start_time: string; duration: string }[] }
+    ).streams;
+
+    const video = streams.find((s) => s.codec_type === 'video')!;
+    const audio = streams.find((s) => s.codec_type === 'audio')!;
+
+    // Both tracks start at (essentially) zero — no A/V desync at the head.
+    expect(Number(video.start_time)).toBeLessThan(0.02);
+    expect(Number(audio.start_time)).toBeLessThan(0.02);
+
+    // Audio and video durations stay within one AAC frame of each other, no matter
+    // how many junctions there are — the single-pass audio cannot drift.
+    expect(Math.abs(Number(video.duration) - Number(audio.duration))).toBeLessThan(0.05);
+  }, 60_000);
+
+  it('handles an input with no audio track', async () => {
+    const silent = join(dir, 'silent.mp4');
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-an', '-c:v', 'libx264', silent]);
+
+    const output = join(dir, 'out-silent.mp4');
+    await parallelConvert(silent, output, { workers: 4, targetBitrate: '800k' });
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.audio).toBeNull();
+    expect(info.duration).toBeCloseTo(10, 0);
+  }, 60_000);
+
   it('accepts a non-MP4 container (MKV) via ffprobe keyframes', async () => {
     const mkv = join(dir, 'in.mkv');
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-c', 'copy', mkv]);
