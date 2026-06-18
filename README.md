@@ -140,7 +140,7 @@ await ffmscript('input.mp4')
 
 ### Parallel transcode — `parallelConvert`
 
-Splits the MP4 on keyframe boundaries, re-encodes the chunks across N workers, then joins them without re-encoding (artefact-free):
+Splits the video on keyframe boundaries, re-encodes the chunks across N workers, then joins them without re-encoding (artefact-free). Accepts MP4, MOV, WebM and MKV inputs (output is always MP4) — keyframes come from the ISOBMFF `stss` box when available, otherwise from ffprobe:
 
 ```ts
 import { parallelConvert } from 'ffm-script'

@@ -92,6 +92,18 @@ describe('parallelConvert', () => {
     expect(info.duration).toBeCloseTo(10, 0);
   }, 60_000);
 
+  it('accepts a non-MP4 container (MKV) via ffprobe keyframes', async () => {
+    const mkv = join(dir, 'in.mkv');
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-c', 'copy', mkv]);
+
+    const output = join(dir, 'out-mkv.mp4');
+    await parallelConvert(mkv, output, { workers: 4, targetBitrate: '800k' });
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.duration).toBeCloseTo(10, 0); // full length preserved across joins
+  }, 60_000);
+
   it('throws InvalidOptionsError for a non-positive worker count', async () => {
     await expect(parallelConvert(SAMPLE, join(dir, 'x.mp4'), { workers: 0 })).rejects.toBeInstanceOf(
       InvalidOptionsError,

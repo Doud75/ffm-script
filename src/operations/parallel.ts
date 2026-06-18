@@ -4,7 +4,8 @@ import { extname, join } from 'node:path';
 import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
 import { validateInput } from '../core/validate.js';
-import { extractKeyframeIndex } from '../core/mp4.js';
+import { resolveKeyframes } from '../core/keyframes.js';
+import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
 import { planSegments, type Segment } from '../core/segments.js';
 import { InvalidFormatError, InvalidOptionsError } from '../errors/index.js';
 import type { ParallelConvertOptions } from '../types/index.js';
@@ -34,15 +35,18 @@ export function resolveWorkers(requested: number | undefined, cpuCount: number):
 }
 
 /**
- * Transcodes an MP4 by splitting it on keyframe boundaries, re-encoding the
+ * Transcodes a video by splitting it on keyframe boundaries, re-encoding the
  * chunks in parallel (one FFmpeg worker each), then concatenating them without
  * re-encoding. Boundaries land on keyframes, so the joins are artefact-free.
  *
- * @param input - Path to the source MP4 file.
+ * Accepts MP4, MOV, WebM and MKV inputs — keyframes come from the ISOBMFF `stss`
+ * box when available, otherwise from ffprobe. Output is always MP4.
+ *
+ * @param input - Path to the source video (MP4/MOV/WebM/MKV).
  * @param output - Path to the destination MP4 file.
  * @param options - Worker count, target bitrate, and progress/abort options.
  * @throws {FileNotFoundError} when `input` does not exist.
- * @throws {InvalidFormatError} when `input`/`output` is not MP4, or the input has no video track.
+ * @throws {InvalidFormatError} when `input` is not a supported video container, `output` is not MP4, or the input has no video keyframes.
  * @throws {InvalidOptionsError} when `workers` is not a positive integer.
  * @throws {FFmpegError} when any FFmpeg process exits non-zero.
  */
@@ -51,14 +55,14 @@ export async function parallelConvert(
   output: string,
   options: ParallelConvertOptions = {},
 ): Promise<void> {
-  await validateInput(input, ['.mp4']);
+  await validateInput(input, VIDEO_INPUT_FORMATS);
   if (extname(output).toLowerCase() !== '.mp4') {
     throw new InvalidFormatError(output, 'output must be an .mp4 file');
   }
 
   const workers = resolveWorkers(options.workers, cpus().length);
 
-  const keyframes = await extractKeyframeIndex(input);
+  const keyframes = await resolveKeyframes(input);
   const segments = planSegments(keyframes, { workerCount: workers });
   const { duration: totalDuration } = await probe(input);
 

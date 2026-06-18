@@ -3,7 +3,19 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { extractKeyframeIndex } from '../src/core/mp4.js';
+import { resolveKeyframes } from '../src/core/keyframes.js';
 import { SAMPLE } from './helpers.js';
+
+/** Asserts a ~1s-spaced keyframe index for a 10s/-g 30 transcode of SAMPLE. */
+function expectOneSecondKeyframes(keyframes: { timestamp: number }[]): void {
+  expect(keyframes.length).toBeGreaterThanOrEqual(9);
+  expect(keyframes.length).toBeLessThanOrEqual(12);
+  expect(keyframes[0]?.timestamp).toBe(0); // anchored to the start
+  for (let i = 1; i < keyframes.length; i++) {
+    expect(keyframes[i]!.timestamp).toBeGreaterThan(keyframes[i - 1]!.timestamp);
+  }
+  expect(keyframes[keyframes.length - 1]!.timestamp).toBeLessThan(10);
+}
 
 describe('extractKeyframeIndex', () => {
   it('reads keyframe timestamps from the MP4 stss box', async () => {
@@ -52,5 +64,43 @@ describe('extractKeyframeIndex', () => {
       }
       expect(keyframes[keyframes.length - 1]!.timestamp).toBeLessThan(10);
     });
+  });
+});
+
+describe('resolveKeyframes (multi-container)', () => {
+  let dir: string;
+  let mov: string;
+  let mkv: string;
+  let webm: string;
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'ffm-containers-'));
+    mov = join(dir, 'sample.mov');
+    mkv = join(dir, 'sample.mkv');
+    webm = join(dir, 'sample.webm');
+    // MOV/MKV: just remux (fast). WebM: re-encode to VP8/Vorbis (fastest libvpx settings).
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-c', 'copy', mov]);
+    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-c', 'copy', mkv]);
+    execFileSync('ffmpeg', [
+      '-y', '-loglevel', 'error', '-i', SAMPLE,
+      '-c:v', 'libvpx', '-b:v', '500k', '-deadline', 'realtime', '-cpu-used', '8', '-g', '30',
+      '-c:a', 'libvorbis', webm,
+    ]);
+  }, 60_000);
+
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('parses MOV through the ISOBMFF stss path (same boxes as MP4)', async () => {
+    expectOneSecondKeyframes(await resolveKeyframes(mov));
+  });
+
+  it('re-indexes MKV via ffprobe and anchors the first keyframe to 0', async () => {
+    expectOneSecondKeyframes(await resolveKeyframes(mkv));
+  });
+
+  it('re-indexes WebM via ffprobe', async () => {
+    expectOneSecondKeyframes(await resolveKeyframes(webm));
   });
 });
