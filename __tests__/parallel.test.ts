@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parallelConvert, resolveWorkers } from '../src/operations/parallel.js';
+import { parallelConvert, resolveWorkers, planSegmentCount } from '../src/operations/parallel.js';
 import { planSegments } from '../src/core/segments.js';
 import { probe } from '../src/operations/probe.js';
 import { FileNotFoundError, InvalidFormatError, InvalidOptionsError } from '../src/errors/index.js';
@@ -11,8 +11,8 @@ import { SAMPLE } from './helpers.js';
 describe('planSegments', () => {
   const keyframes = Array.from({ length: 10 }, (_, i) => ({ timestamp: i }));
 
-  it('splits on keyframes into at most workerCount segments', () => {
-    const segments = planSegments(keyframes, { workerCount: 4 });
+  it('splits on keyframes into at most segmentCount segments', () => {
+    const segments = planSegments(keyframes, { segmentCount: 4 });
     expect(segments).toHaveLength(4);
     expect(segments[0]).toEqual({ index: 0, startTime: 0, endTime: 2 });
     expect(segments[3]).toEqual({ index: 3, startTime: 7 }); // last → to EOF
@@ -23,8 +23,30 @@ describe('planSegments', () => {
   });
 
   it('never produces more segments than keyframes', () => {
-    expect(planSegments([{ timestamp: 0 }], { workerCount: 8 })).toHaveLength(1);
-    expect(planSegments([], { workerCount: 4 })).toHaveLength(0);
+    expect(planSegments([{ timestamp: 0 }], { segmentCount: 8 })).toHaveLength(1);
+    expect(planSegments([], { segmentCount: 4 })).toHaveLength(0);
+  });
+});
+
+describe('planSegmentCount', () => {
+  it('oversubscribes the pool for long videos (more segments than workers)', () => {
+    // 10 min, plenty of keyframes → SEGMENTS_PER_WORKER (3) per worker.
+    expect(planSegmentCount(4, 600, 600)).toBe(12);
+    expect(planSegmentCount(8, 600, 600)).toBe(24);
+  });
+
+  it('keeps chunks at least MIN_CHUNK_SECONDS long', () => {
+    // 30s / 5s = 6 max chunks, below the 12 the pool would otherwise want.
+    expect(planSegmentCount(4, 30, 30)).toBe(6);
+  });
+
+  it('still uses every worker on short videos', () => {
+    // 10s would cap at 2 by min-chunk, but we never go below the worker count.
+    expect(planSegmentCount(4, 10, 10)).toBe(4);
+  });
+
+  it('never asks for more segments than there are keyframes', () => {
+    expect(planSegmentCount(8, 600, 5)).toBe(5);
   });
 });
 
