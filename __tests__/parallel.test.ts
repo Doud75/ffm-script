@@ -2,7 +2,12 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parallelConvert, resolveWorkers, planSegmentCount } from '../src/operations/parallel.js';
+import {
+  parallelConvert,
+  resolveWorkers,
+  planSegmentCount,
+  aggregateProgress,
+} from '../src/operations/parallel.js';
 import { planSegments } from '../src/core/segments.js';
 import { probe } from '../src/operations/probe.js';
 import { FileNotFoundError, InvalidFormatError, InvalidOptionsError } from '../src/errors/index.js';
@@ -47,6 +52,29 @@ describe('planSegmentCount', () => {
 
   it('never asks for more segments than there are keyframes', () => {
     expect(planSegmentCount(8, 600, 5)).toBe(5);
+  });
+});
+
+describe('aggregateProgress', () => {
+  it('weights each segment by duration, not by its own percentage', () => {
+    // Segment A (30s) fully done, segment B (10s) untouched, total 40s.
+    // Duration-weighted → 30/40 = 75%. A naive average of percentages would be
+    // (100% + 0%) / 2 = 50%, which would under-report the work actually done.
+    expect(aggregateProgress([30, 0], 40).percent).toBe(75);
+    expect(aggregateProgress([15, 5], 40).percent).toBe(50);
+  });
+
+  it('reports the summed processed seconds and the total', () => {
+    expect(aggregateProgress([15, 5], 40)).toEqual({
+      percent: 50,
+      currentTime: 20,
+      totalTime: 40,
+    });
+  });
+
+  it('clamps to 100 and handles a zero total', () => {
+    expect(aggregateProgress([30, 30], 40).percent).toBe(100); // over-run clamped
+    expect(aggregateProgress([0], 0).percent).toBe(0); // no division by zero
   });
 });
 
@@ -99,6 +127,11 @@ describe('parallelConvert', () => {
     expect(info.duration).toBeCloseTo(10, 0); // full length preserved across joins
     expect(percents.length).toBeGreaterThan(0);
     expect(Math.max(...percents)).toBeLessThanOrEqual(100);
+    // Aggregated progress never goes backwards and climbs to near-completion.
+    for (let i = 1; i < percents.length; i++) {
+      expect(percents[i]!).toBeGreaterThanOrEqual(percents[i - 1]!);
+    }
+    expect(Math.max(...percents)).toBeGreaterThan(90);
   }, 60_000);
 
   it('falls back to frame-boundary cuts for an all-intra input (no stss box)', async () => {

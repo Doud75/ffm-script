@@ -8,7 +8,7 @@ import { resolveKeyframes } from '../core/keyframes.js';
 import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
 import { planSegments, type Segment } from '../core/segments.js';
 import { InvalidFormatError, InvalidOptionsError } from '../errors/index.js';
-import type { ParallelConvertOptions } from '../types/index.js';
+import type { ParallelConvertOptions, Progress } from '../types/index.js';
 import { probe } from './probe.js';
 
 /**
@@ -48,6 +48,24 @@ const MIN_CHUNK_SECONDS = 5;
 export function planSegmentCount(workers: number, totalDuration: number, keyframeCount: number): number {
   const maxByMinChunk = Math.max(workers, Math.floor(totalDuration / MIN_CHUNK_SECONDS));
   return Math.min(workers * SEGMENTS_PER_WORKER, maxByMinChunk, keyframeCount);
+}
+
+/**
+ * Aggregates per-segment progress into an overall {@link Progress}.
+ *
+ * Contributions are weighted by duration: each segment reports the *seconds* it
+ * has processed (not its own percentage), and those seconds are summed against
+ * the total. A long chunk therefore moves the bar more than a short one — unlike
+ * naively averaging each segment's percentage, which would over-weight short
+ * chunks.
+ *
+ * @param processedBySegment - Seconds processed so far, per segment.
+ * @param totalDuration - Sum of every segment's duration, in seconds.
+ */
+export function aggregateProgress(processedBySegment: number[], totalDuration: number): Progress {
+  const processed = processedBySegment.reduce((a, b) => a + b, 0);
+  const percent = totalDuration > 0 ? Math.min(100, (processed / totalDuration) * 100) : 0;
+  return { percent, currentTime: processed, totalTime: totalDuration };
 }
 
 /**
@@ -130,9 +148,7 @@ async function transcodeSegments(
   const reportAggregate = (index: number, currentTime: number): void => {
     if (options.onProgress === undefined) return;
     processedBySegment[index] = currentTime;
-    const processed = processedBySegment.reduce((a, b) => a + b, 0);
-    const percent = totalDuration > 0 ? Math.min(100, (processed / totalDuration) * 100) : 0;
-    options.onProgress({ percent, currentTime: processed, totalTime: totalDuration });
+    options.onProgress(aggregateProgress(processedBySegment, totalDuration));
   };
 
   await runPool(segments, concurrency, async (seg) => {
