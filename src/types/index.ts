@@ -135,6 +135,23 @@ export interface HLSOptions {
   signal?: AbortSignal;
 }
 
+/** A keyframe (sync sample) position, in seconds from the start. */
+export interface Keyframe {
+  timestamp: number;
+}
+
+/** Options for {@link parallelConvert}. */
+export interface ParallelConvertOptions {
+  /** Number of parallel FFmpeg workers. Defaults to the host CPU count. */
+  workers?: number;
+  /** Target video bitrate, e.g. `'2000k'` (FFmpeg `-b:v`). */
+  targetBitrate?: string;
+  /** Called with aggregated progress across all workers. */
+  onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+}
+
 /** Progress information reported through an `onProgress` callback. */
 export interface Progress {
   /** Completion percentage, clamped to [0, 100]. */
