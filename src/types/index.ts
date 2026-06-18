@@ -142,7 +142,11 @@ export interface Keyframe {
 
 /** Options for {@link parallelConvert}. */
 export interface ParallelConvertOptions {
-  /** Number of parallel FFmpeg workers. Defaults to the host CPU count. */
+  /**
+   * Number of parallel FFmpeg workers. Defaults to half the host's logical CPU
+   * cores (at least 1), leaving the machine usable during the transcode. A value
+   * larger than the core count is capped to it to avoid oversubscribing the CPU.
+   */
   workers?: number;
   /** Target video bitrate, e.g. `'2000k'` (FFmpeg `-b:v`). */
   targetBitrate?: string;

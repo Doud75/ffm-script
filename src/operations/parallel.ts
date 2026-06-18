@@ -11,6 +11,29 @@ import type { ParallelConvertOptions } from '../types/index.js';
 import { probe } from './probe.js';
 
 /**
+ * Resolves how many parallel FFmpeg workers to run.
+ *
+ * - Omitted → half the host's logical cores (at least 1). Each FFmpeg process is
+ *   itself multithreaded and tries to grab the whole CPU, so spawning one worker
+ *   per core oversubscribes the machine and makes it unusable. Half leaves room to
+ *   keep working, and on a hyperthreaded host "half the logical cores" ≈ the
+ *   physical core count — the right granularity for encoding.
+ * - Provided → validated as a positive integer, then capped at the core count:
+ *   asking for more workers than cores would only oversubscribe the CPU.
+ *
+ * @throws {InvalidOptionsError} when a provided `requested` is not a positive integer.
+ */
+export function resolveWorkers(requested: number | undefined, cpuCount: number): number {
+  if (requested === undefined) {
+    return Math.max(1, Math.floor(cpuCount / 2));
+  }
+  if (!Number.isInteger(requested) || requested < 1) {
+    throw new InvalidOptionsError(`workers must be a positive integer (got ${requested})`);
+  }
+  return Math.min(requested, cpuCount);
+}
+
+/**
  * Transcodes an MP4 by splitting it on keyframe boundaries, re-encoding the
  * chunks in parallel (one FFmpeg worker each), then concatenating them without
  * re-encoding. Boundaries land on keyframes, so the joins are artefact-free.
@@ -33,10 +56,7 @@ export async function parallelConvert(
     throw new InvalidFormatError(output, 'output must be an .mp4 file');
   }
 
-  const workers = options.workers ?? cpus().length;
-  if (!Number.isInteger(workers) || workers < 1) {
-    throw new InvalidOptionsError(`workers must be a positive integer (got ${workers})`);
-  }
+  const workers = resolveWorkers(options.workers, cpus().length);
 
   const keyframes = await extractKeyframeIndex(input);
   const segments = planSegments(keyframes, { workerCount: workers });
