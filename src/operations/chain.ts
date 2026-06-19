@@ -5,6 +5,7 @@ import { validateInput } from '../core/validate.js';
 import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
 import { parseTimestamp } from '../core/time.js';
 import { buildScaleFilter } from '../core/scale.js';
+import { qualityArgs, assertQualityBitrateExclusive } from '../core/quality.js';
 import { InvalidFormatError, InvalidOptionsError } from '../errors/index.js';
 import type { ConvertOptions, Progress, TrimOptions } from '../types/index.js';
 import { probe } from './probe.js';
@@ -58,6 +59,7 @@ export class FfmScriptChain {
     if (this.#trim === undefined && this.#convert === undefined) {
       throw new InvalidOptionsError('chain requires at least one operation before save()');
     }
+    assertQualityBitrateExclusive(this.#convert?.quality, this.#convert?.videoBitrate);
 
     let start: number | undefined;
     let trimDuration: number | undefined;
@@ -88,6 +90,7 @@ export class FfmScriptChain {
 
     if (reencode) {
       args.push('-c:v', this.#convert?.videoCodec ?? DEFAULT_VIDEO_CODEC);
+      if (this.#convert?.quality !== undefined) args.push(...qualityArgs(this.#convert.quality));
       if (this.#convert?.videoBitrate !== undefined) args.push('-b:v', this.#convert.videoBitrate);
       args.push('-c:a', this.#convert?.audioCodec ?? DEFAULT_AUDIO_CODEC);
       if (this.#convert?.audioBitrate !== undefined) args.push('-b:a', this.#convert.audioBitrate);

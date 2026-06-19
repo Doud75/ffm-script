@@ -50,10 +50,23 @@ export interface ProbeResult {
   audio: AudioStream | null;
 }
 
+/**
+ * Semantic video quality preset (libx264 CRF + speed preset):
+ * - `'high'`     — visually lossless, larger files (`-crf 18 -preset slow`).
+ * - `'balanced'` — sensible default trade-off (`-crf 23 -preset medium`).
+ * - `'small'`    — smaller files, lower quality (`-crf 28 -preset medium`).
+ *
+ * Mutually exclusive with an explicit video bitrate (CRF targets a quality,
+ * a bitrate targets a size).
+ */
+export type Quality = 'high' | 'balanced' | 'small';
+
 /** Options for {@link convert}. All fields are optional; sensible defaults apply. */
 export interface ConvertOptions {
   /** Video codec / encoder (FFmpeg `-c:v`). Defaults to `'libx264'`. */
   videoCodec?: string;
+  /** Semantic quality preset (CRF + speed). Mutually exclusive with `videoBitrate`. */
+  quality?: Quality;
   /** Audio codec / encoder (FFmpeg `-c:a`). Defaults to `'aac'`. */
   audioCodec?: string;
   /** Target video bitrate, e.g. `'2M'` or `'2500k'` (FFmpeg `-b:v`). */
@@ -148,8 +161,10 @@ export interface ParallelConvertOptions {
    * larger than the core count is capped to it to avoid oversubscribing the CPU.
    */
   workers?: number;
-  /** Target video bitrate, e.g. `'2000k'` (FFmpeg `-b:v`). */
+  /** Target video bitrate, e.g. `'2000k'` (FFmpeg `-b:v`). Mutually exclusive with `quality`. */
   targetBitrate?: string;
+  /** Semantic quality preset (CRF + speed). Mutually exclusive with `targetBitrate`. */
+  quality?: Quality;
   /** Called with aggregated progress across all workers. */
   onProgress?: (progress: Progress) => void;
   /** Aborts the operation; the returned promise rejects with an `AbortError`. */

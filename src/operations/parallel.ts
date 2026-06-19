@@ -4,6 +4,7 @@ import { extname, join } from 'node:path';
 import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
 import { concatDemuxer } from '../core/concat.js';
+import { qualityArgs, assertQualityBitrateExclusive } from '../core/quality.js';
 import { validateInput } from '../core/validate.js';
 import { resolveKeyframes } from '../core/keyframes.js';
 import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
@@ -94,6 +95,7 @@ export async function parallelConvert(
   if (extname(output).toLowerCase() !== '.mp4') {
     throw new InvalidFormatError(output, 'output must be an .mp4 file');
   }
+  assertQualityBitrateExclusive(options.quality, options.targetBitrate);
 
   const workers = resolveWorkers(options.workers, cpus().length);
 
@@ -161,6 +163,7 @@ async function transcodeSegments(
     const args = ['-ss', String(seg.startTime), '-i', input];
     if (seg.endTime !== undefined) args.push('-t', String(chunkDuration));
     args.push('-an', '-c:v', 'libx264');
+    if (options.quality !== undefined) args.push(...qualityArgs(options.quality));
     if (options.targetBitrate !== undefined) args.push('-b:v', options.targetBitrate);
     args.push('-y', chunk);
 
