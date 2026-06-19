@@ -224,6 +224,28 @@ await overlay('input.mp4', 'output.mp4', {
 
 Only `watermark` is required — it defaults to a fully opaque logo in the bottom-right corner at its native size.
 
+### Subtitles — `extractSubtitles` / `burnSubtitles`
+
+Pull a subtitle track out into a standalone file (`.srt`, `.vtt` or `.ass`) — the embedded codec is converted to the format you ask for via the output extension:
+
+```ts
+import { extractSubtitles } from 'ffm-script'
+
+await extractSubtitles('movie.mkv', 'subs.srt', { track: 0 }) // track defaults to 0
+```
+
+Or hardcode subtitles into the picture (burn-in) — from an external file, or from a track already embedded in the input. The video is re-encoded; the audio is copied through:
+
+```ts
+import { burnSubtitles } from 'ffm-script'
+
+// From an external file
+await burnSubtitles('input.mp4', 'output.mp4', { subtitles: 'subs.srt' })
+
+// From an embedded track
+await burnSubtitles('movie.mkv', 'output.mp4', { track: 0 })
+```
+
 ### Raw FFmpeg — `run`
 
 The escape hatch for anything the typed operations don't cover. Pass an arbitrary argument list straight to `ffmpeg` and still get progress parsing, cancellation, timeout and the typed error hierarchy. Arguments are forwarded verbatim — you own the inputs, the output, and any `-y` to overwrite:
