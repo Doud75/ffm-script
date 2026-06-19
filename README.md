@@ -246,6 +246,26 @@ await burnSubtitles('input.mp4', 'output.mp4', { subtitles: 'subs.srt' })
 await burnSubtitles('movie.mkv', 'output.mp4', { track: 0 })
 ```
 
+### Animated GIF / WebP — `toAnimation`
+
+Export a slice of a video as an animated image. The format is taken from the output extension — `.gif` (with a per-clip generated palette for crisp colours) or `.webp` (truecolour animated WebP):
+
+```ts
+import { toAnimation } from 'ffm-script'
+
+await toAnimation('input.mp4', 'clip.gif', {
+  start: 3,    // seconds, or 'HH:MM:SS[.ms]'; default 0
+  end: 6,      // default end of the input
+  fps: 12,     // default 15
+  width: 480,  // scaled, aspect ratio preserved
+  loop: 0,     // 0 loops forever (default), -1 plays once
+})
+
+await toAnimation('input.mp4', 'clip.webp', { end: 4 }) // animated WebP
+```
+
+GIFs are capped at 256 colours, so `toAnimation` generates an optimal palette per clip and reuses it — much better than FFmpeg's default fixed palette. Keep `fps`, `width` and the range small to keep the file light.
+
 ### Raw FFmpeg — `run`
 
 The escape hatch for anything the typed operations don't cover. Pass an arbitrary argument list straight to `ffmpeg` and still get progress parsing, cancellation, timeout and the typed error hierarchy. Arguments are forwarded verbatim — you own the inputs, the output, and any `-y` to overwrite:

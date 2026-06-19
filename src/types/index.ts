@@ -201,6 +201,24 @@ export interface OverlayOptions {
   signal?: AbortSignal;
 }
 
+/** Options for {@link toAnimation}. */
+export interface AnimationOptions {
+  /** Start of the clip, in seconds or `HH:MM:SS[.ms]`. Defaults to `0` (start of the input). */
+  start?: number | string;
+  /** End of the clip, in seconds or `HH:MM:SS[.ms]`. Defaults to the end of the input. Must be after `start`. */
+  end?: number | string;
+  /** Output frame rate. Defaults to `15`. */
+  fps?: number;
+  /** Output width in pixels; height preserves the aspect ratio. Omitted → source width. */
+  width?: number;
+  /** Loop count: `0` loops forever (default), `-1` plays once. */
+  loop?: number;
+  /** Called with progress updates as the encode advances. */
+  onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+}
+
 /** Options for {@link extractSubtitles}. */
 export interface ExtractSubtitlesOptions {
   /** Which subtitle track to extract, 0-based among the input's subtitle streams. Defaults to `0`. */
