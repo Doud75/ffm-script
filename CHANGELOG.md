@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `run(args, options)`: raw FFmpeg escape hatch — pass an arbitrary argument list straight to `ffmpeg` while keeping the library's progress parsing, `AbortSignal`, timeout and typed error hierarchy (`FFmpegError`, `FFmpegNotFoundError`). Arguments are forwarded verbatim (you own the inputs, output and any `-y`). For a progress percentage, pass the media `duration`; the input is **not** auto-probed, since it can't be reliably identified in a free-form argument list.
+
 ## [0.4.0] - 2026-06-18
 
 ### Added
@@ -54,7 +60,8 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
-[Unreleased]: https://github.com/Doud75/ffm-script/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Doud75/ffm-script/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.2.0
 [0.1.1]: https://github.com/Doud75/ffm-script/releases/tag/v0.1.1
