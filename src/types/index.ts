@@ -156,6 +156,27 @@ export interface ParallelConvertOptions {
   signal?: AbortSignal;
 }
 
+/** Options for {@link concat}. */
+export interface ConcatOptions {
+  /**
+   * How the files are joined:
+   * - 'fast'    — concat demuxer with stream copy (no re-encode). Fast, but every
+   *               input must share the same codecs and parameters or the output is
+   *               corrupt.
+   * - 'precise' — concat filter, re-encoding the output. Handles heterogeneous
+   *               inputs (different codecs/resolutions) at the cost of speed.
+   * - 'auto'    — probes the inputs and picks 'fast' when they are compatible,
+   *               'precise' otherwise.
+   *
+   * Defaults to 'auto'.
+   */
+  mode?: 'fast' | 'precise' | 'auto';
+  /** Called with progress updates as the join advances. */
+  onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+}
+
 /** Options for {@link run}, the raw FFmpeg escape hatch. */
 export interface RunOptions {
   /**
