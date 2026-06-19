@@ -11,6 +11,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `overlay(input, output, options)`: burn a watermark image (PNG/JPEG/WebP) onto a video. Anchor it to a corner or the centre (`position`), inset it from the edges (`margin`), fade it (`opacity`), and scale it to a `width`. The video is re-encoded (`libx264`) while the audio is stream-copied unchanged; silent inputs are handled.
 - `extractSubtitles(input, output, options)`: pull a subtitle track out of a video into a standalone `.srt`, `.vtt` or `.ass` file, converting the embedded codec to the format chosen by the output extension (e.g. MP4 `mov_text` → SubRip). Pick the track with `track` (0-based).
 - `burnSubtitles(input, output, options)`: hardcode subtitles into the picture. Render an external file (`subtitles`) or an embedded `track` of the input. The video is re-encoded (`libx264`) and the audio is stream-copied unchanged.
+- `toAnimation(input, output, options)`: export a range of a video as an animated image — a GIF or animated WebP, picked from the output extension. GIFs use a per-clip generated palette (`palettegen`/`paletteuse`) for far better quality than the default fixed palette. Control the clip with `start`/`end`, and the size with `fps`/`width`/`loop`.
 
 ## [0.5.1] - 2026-06-19
 
