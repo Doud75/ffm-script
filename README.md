@@ -175,11 +175,14 @@ import { parallelConvert } from 'ffm-script'
 await parallelConvert('input.mp4', 'output.mp4', {
   workers: 4,
   targetBitrate: '2000k',
+  width: 1280,           // height auto-scaled to preserve aspect ratio
   onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`),
 })
 ```
 
 `workers` is optional. It defaults to **half the host's logical cores** (at least 1) so the machine stays usable during the transcode — each FFmpeg worker is itself multithreaded, so one worker per core would oversubscribe the CPU. A value above the core count is capped to it.
+
+`width` / `height` resize the output just like [`convert`](#transcode--convert) — set one to preserve the aspect ratio, or both to force exact dimensions. The same scale is applied to every chunk, so the joins stay artefact-free.
 
 ### Concatenate files — `concat`
 
