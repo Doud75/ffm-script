@@ -156,6 +156,23 @@ export interface ParallelConvertOptions {
   signal?: AbortSignal;
 }
 
+/** Options for {@link run}, the raw FFmpeg escape hatch. */
+export interface RunOptions {
+  /**
+   * Total media duration in seconds, used to turn FFmpeg's `time=` output into a
+   * percentage. The input is **not** auto-probed: in a free-form argument list
+   * there is no reliable way to tell which token is the input. Omit it and no
+   * progress events are emitted (the run still works); provide it to get `percent`.
+   */
+  duration?: number;
+  /** Called with progress updates as the run advances. Requires `duration`. */
+  onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+  /** Max run time in milliseconds; on overrun the process is killed (`FFmpegTimeoutError`). */
+  timeout?: number;
+}
+
 /** Progress information reported through an `onProgress` callback. */
 export interface Progress {
   /** Completion percentage, clamped to [0, 100]. */
