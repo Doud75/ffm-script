@@ -10,7 +10,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # required to create the GitHub Release
       id-token: write # required for npm Trusted Publishing (OIDC) + provenance
     steps:
       - name: Checkout
@@ -62,3 +62,22 @@ jobs:
       # Configure the trusted publisher for this package on npmjs.com first.
       - name: Publish to npm
         run: npm publish --provenance --access public
+
+      # Create the matching GitHub Release so the repo's "Latest" badge tracks the
+      # published version. Notes are the CHANGELOG section for this version; if it
+      # has none, fall back to GitHub's auto-generated notes.
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" { flag=1; next }
+            flag && /^## \[/ { exit }
+            flag { print }
+          ' CHANGELOG.md > notes.md
+          if [ -s notes.md ]; then
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes-file notes.md
+          else
+            gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          fi
