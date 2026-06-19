@@ -201,6 +201,32 @@ export interface OverlayOptions {
   signal?: AbortSignal;
 }
 
+/** Options for {@link extractSubtitles}. */
+export interface ExtractSubtitlesOptions {
+  /** Which subtitle track to extract, 0-based among the input's subtitle streams. Defaults to `0`. */
+  track?: number;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+}
+
+/** Options for {@link burnSubtitles}. */
+export interface BurnSubtitlesOptions {
+  /**
+   * Path to an external subtitle file (`.srt`, `.vtt` or `.ass`) to burn in.
+   * When omitted, the embedded subtitle `track` of the input is rendered instead.
+   */
+  subtitles?: string;
+  /**
+   * Which embedded subtitle track to burn, 0-based among the input's subtitle
+   * streams. Ignored when an external `subtitles` file is given. Defaults to `0`.
+   */
+  track?: number;
+  /** Called with progress updates as the burn-in advances. */
+  onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+}
+
 /** Options for {@link concat}. */
 export interface ConcatOptions {
   /**
