@@ -4,13 +4,14 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-06-19
 
 ### Added
 
 - `run(args, options)`: raw FFmpeg escape hatch — pass an arbitrary argument list straight to `ffmpeg` while keeping the library's progress parsing, `AbortSignal`, timeout and typed error hierarchy (`FFmpegError`, `FFmpegNotFoundError`). Arguments are forwarded verbatim (you own the inputs, output and any `-y`). For a progress percentage, pass the media `duration`; the input is **not** auto-probed, since it can't be reliably identified in a free-form argument list.
 - `concat(inputs, output, options)`: join several video files into one MP4. `mode: 'fast'` uses the concat demuxer (stream copy, no re-encode, requires matching codecs/parameters), `'precise'` uses the concat filter (re-encodes, handles heterogeneous inputs), and `'auto'` (default) probes the inputs and picks the right one. Reuses the `fast`/`precise` vocabulary established by `trim`.
 - `quality` option on `convert`, `parallelConvert` and the chainable `.convert(...)`: a semantic preset (`'high'` / `'balanced'` / `'small'`) mapped to libx264 CRF + speed preset. Mutually exclusive with an explicit video bitrate (constant-quality vs target-size are opposite modes) — setting both throws `InvalidOptionsError`.
+- Chainable `.raw(args)`: the in-pipeline escape hatch — inject arbitrary FFmpeg flags into the fused `trim`/`convert` command (the counterpart to `run` inside a chain). Flags are appended to the output side so explicit ones override the generated defaults (e.g. a `-vf` overrides the scale from `.convert({ width })`), and it forces a re-encode.
 
 ## [0.4.0] - 2026-06-18
 
@@ -62,7 +63,7 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
-[Unreleased]: https://github.com/Doud75/ffm-script/compare/v0.4.0...HEAD
+[0.6.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.5.0
 [0.4.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.4.0
 [0.3.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.2.0
