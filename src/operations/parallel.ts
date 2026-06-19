@@ -5,6 +5,7 @@ import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
 import { concatDemuxer } from '../core/concat.js';
 import { qualityArgs, assertQualityBitrateExclusive } from '../core/quality.js';
+import { buildScaleFilter } from '../core/scale.js';
 import { validateInput } from '../core/validate.js';
 import { resolveKeyframes } from '../core/keyframes.js';
 import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
@@ -80,7 +81,7 @@ export function aggregateProgress(processedBySegment: number[], totalDuration: n
  *
  * @param input - Path to the source video (MP4/MOV/WebM/MKV).
  * @param output - Path to the destination MP4 file.
- * @param options - Worker count, target bitrate, and progress/abort options.
+ * @param options - Worker count, target bitrate/quality, output resolution, and progress/abort options.
  * @throws {FileNotFoundError} when `input` does not exist.
  * @throws {InvalidFormatError} when `input` is not a supported video container, `output` is not MP4, or the input has no video keyframes.
  * @throws {InvalidOptionsError} when `workers` is not a positive integer.
@@ -165,6 +166,11 @@ async function transcodeSegments(
     args.push('-an', '-c:v', 'libx264');
     if (options.quality !== undefined) args.push(...qualityArgs(options.quality));
     if (options.targetBitrate !== undefined) args.push('-b:v', options.targetBitrate);
+    // Same scale filter on every chunk → uniform resolution, so the concat
+    // demuxer can still stream-copy the joins. All chunks share the source
+    // dimensions, so the `-2` placeholder resolves identically everywhere.
+    const scale = buildScaleFilter(options.width, options.height);
+    if (scale !== undefined) args.push('-vf', scale);
     args.push('-y', chunk);
 
     await spawnFFmpeg({
