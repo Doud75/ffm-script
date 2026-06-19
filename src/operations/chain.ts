@@ -29,6 +29,7 @@ export class FfmScriptChain {
   readonly #input: string;
   #trim: TrimOptions | undefined;
   #convert: ConvertOptions | undefined;
+  #raw: string[] | undefined;
 
   constructor(input: string) {
     this.#input = input;
@@ -45,6 +46,23 @@ export class FfmScriptChain {
   }
 
   /**
+   * Injects raw FFmpeg arguments into the pipeline — the in-chain escape hatch,
+   * the counterpart to {@link run} but fused with `trim`/`convert` in one pass.
+   *
+   * The flags are appended to the **output** side of the command, after the
+   * options generated from `trim`/`convert`, so an explicit flag wins over a
+   * generated one (a `-vf` here overrides the scale built from `.convert({ width })`).
+   *
+   * Forces a re-encode: these customize the output encode and are incompatible
+   * with the stream-copy fast path. For pure stream-copy or muxer-only tweaks,
+   * reach for {@link run} instead. The last `.raw()` call wins.
+   */
+  raw(args: string[]): this {
+    this.#raw = args;
+    return this;
+  }
+
+  /**
    * Runs the accumulated operations as one FFmpeg command and writes `output`.
    *
    * @throws {FileNotFoundError} when the input does not exist.
@@ -56,7 +74,7 @@ export class FfmScriptChain {
     if (extname(output).toLowerCase() !== '.mp4') {
       throw new InvalidFormatError(output, 'output must be an .mp4 file');
     }
-    if (this.#trim === undefined && this.#convert === undefined) {
+    if (this.#trim === undefined && this.#convert === undefined && this.#raw === undefined) {
       throw new InvalidOptionsError('chain requires at least one operation before save()');
     }
     assertQualityBitrateExclusive(this.#convert?.quality, this.#convert?.videoBitrate);
@@ -75,10 +93,13 @@ export class FfmScriptChain {
       trimDuration = end - start;
     }
 
-    // Re-encode when converting, or for a frame-accurate (precise) trim;
-    // otherwise a plain keyframe-bound stream copy is enough.
+    // Re-encode when converting, for a frame-accurate (precise) trim, or when raw
+    // flags are injected (they customize the output encode); otherwise a plain
+    // keyframe-bound stream copy is enough.
     const reencode =
-      this.#convert !== undefined || (this.#trim?.mode ?? 'fast') === 'precise';
+      this.#convert !== undefined ||
+      (this.#trim?.mode ?? 'fast') === 'precise' ||
+      this.#raw !== undefined;
 
     const args: string[] = [];
     if (start !== undefined) args.push('-ss', String(start));
@@ -97,6 +118,10 @@ export class FfmScriptChain {
     } else {
       args.push('-c', 'copy');
     }
+
+    // Raw args last, so explicit user flags override the generated ones.
+    if (this.#raw !== undefined) args.push(...this.#raw);
+
     args.push('-y', output);
 
     // Progress needs a total duration: the trim length, else the input's.

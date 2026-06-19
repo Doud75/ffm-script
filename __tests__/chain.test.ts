@@ -46,6 +46,40 @@ describe('ffmscript (chainable API)', () => {
     expect(Math.max(...percents)).toBeLessThanOrEqual(100);
   }, 30_000);
 
+  it('runs with raw args only, re-encoding the output', async () => {
+    const output = join(dir, 'raw-only.mp4');
+    // No trim/convert: .raw() alone is a valid operation and forces a re-encode.
+    await ffmscript(SAMPLE).raw(['-c:v', 'libx264', '-crf', '30']).save(output);
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.duration).toBeCloseTo(10, 0);
+  }, 30_000);
+
+  it('lets raw flags override the generated ones (raw -vf wins over the scale)', async () => {
+    const output = join(dir, 'raw-override.mp4');
+    // .convert({ width: 640 }) would scale to 640, but the raw -vf is appended
+    // after it, and FFmpeg's last -vf wins → 320.
+    await ffmscript(SAMPLE)
+      .convert({ width: 640 })
+      .raw(['-vf', 'scale=320:-2'])
+      .save(output);
+
+    expect((await probe(output)).video?.width).toBe(320);
+  }, 30_000);
+
+  it('fuses trim + raw into a single re-encoding pass', async () => {
+    const output = join(dir, 'trim-raw.mp4');
+    await ffmscript(SAMPLE)
+      .trim({ start: 1, end: 5 })
+      .raw(['-vf', 'scale=320:-2'])
+      .save(output);
+
+    const info = await probe(output);
+    expect(info.duration).toBeCloseTo(4, 0);
+    expect(info.video?.width).toBe(320);
+  }, 30_000);
+
   it('throws InvalidOptionsError when nothing was queued', async () => {
     await expect(ffmscript(SAMPLE).save(join(dir, 'empty.mp4'))).rejects.toBeInstanceOf(
       InvalidOptionsError,

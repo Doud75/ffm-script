@@ -154,6 +154,17 @@ await ffmscript('input.mp4')
   .save('output.mp4', { onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`) })
 ```
 
+Need a flag the typed options don't expose? `.raw(args)` injects arbitrary FFmpeg arguments into the same fused pass — the in-pipeline counterpart to [`run`](#raw-ffmpeg--run):
+
+```ts
+await ffmscript('input.mp4')
+  .trim({ start: 60, end: 180 })
+  .raw(['-vf', 'eq=contrast=1.2', '-crf', '18'])
+  .save('output.mp4')
+```
+
+Raw flags are appended to the **output** side, after the options generated from `trim`/`convert`, so an explicit flag wins over a generated one (a `-vf` here overrides the scale from `.convert({ width })`). `.raw()` forces a re-encode — for pure stream-copy or muxer-only tweaks, use [`run`](#raw-ffmpeg--run) instead.
+
 ### Parallel transcode — `parallelConvert`
 
 Splits the video on keyframe boundaries, re-encodes the chunks across N workers, then joins them without re-encoding (artefact-free). The audio is encoded in a single continuous pass and muxed back, so the joins stay drift-free no matter how many chunks the video is cut into. Accepts MP4, MOV, WebM and MKV inputs (output is always MP4) — keyframes come from the ISOBMFF `stss` box when available, otherwise from ffprobe:
