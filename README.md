@@ -154,6 +154,22 @@ await parallelConvert('input.mp4', 'output.mp4', {
 
 `workers` is optional. It defaults to **half the host's logical cores** (at least 1) so the machine stays usable during the transcode — each FFmpeg worker is itself multithreaded, so one worker per core would oversubscribe the CPU. A value above the core count is capped to it.
 
+### Raw FFmpeg — `run`
+
+The escape hatch for anything the typed operations don't cover. Pass an arbitrary argument list straight to `ffmpeg` and still get progress parsing, cancellation, timeout and the typed error hierarchy. Arguments are forwarded verbatim — you own the inputs, the output, and any `-y` to overwrite:
+
+```ts
+import { run } from 'ffm-script'
+
+await run(['-i', 'input.mp4', '-vf', 'scale=1280:-2', '-crf', '18', '-y', 'out.mp4'], {
+  duration: 124, // optional, enables the progress percentage
+  onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`),
+  timeout: 60_000,
+})
+```
+
+For a progress percentage, pass the media `duration` — the input is **not** auto-probed, since there's no reliable way to tell which token is the input in a free-form argument list. Without it the run still works, it just emits no progress.
+
 ## Progress
 
 `convert` and `trim` accept an `onProgress` callback. The percentage is parsed from FFmpeg's output against the known duration:

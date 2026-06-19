@@ -4,6 +4,7 @@ export { convert } from './operations/convert.js';
 export { trim } from './operations/trim.js';
 export { extractAudio } from './operations/extract.js';
 export { thumbnail } from './operations/thumbnail.js';
+export { run } from './operations/run.js';
 export { toHLS } from './operations/hls.js';
 export { ffmscript, FfmScriptChain } from './operations/chain.js';
 export type { SaveOptions } from './operations/chain.js';
