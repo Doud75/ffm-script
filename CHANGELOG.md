@@ -9,6 +9,7 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Added
 
 - `run(args, options)`: raw FFmpeg escape hatch — pass an arbitrary argument list straight to `ffmpeg` while keeping the library's progress parsing, `AbortSignal`, timeout and typed error hierarchy (`FFmpegError`, `FFmpegNotFoundError`). Arguments are forwarded verbatim (you own the inputs, output and any `-y`). For a progress percentage, pass the media `duration`; the input is **not** auto-probed, since it can't be reliably identified in a free-form argument list.
+- `concat(inputs, output, options)`: join several video files into one MP4. `mode: 'fast'` uses the concat demuxer (stream copy, no re-encode, requires matching codecs/parameters), `'precise'` uses the concat filter (re-encodes, handles heterogeneous inputs), and `'auto'` (default) probes the inputs and picks the right one. Reuses the `fast`/`precise` vocabulary established by `trim`.
 
 ## [0.4.0] - 2026-06-18
 
