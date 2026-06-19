@@ -154,6 +154,27 @@ await parallelConvert('input.mp4', 'output.mp4', {
 
 `workers` is optional. It defaults to **half the host's logical cores** (at least 1) so the machine stays usable during the transcode — each FFmpeg worker is itself multithreaded, so one worker per core would oversubscribe the CPU. A value above the core count is capped to it.
 
+### Concatenate files — `concat`
+
+Join several videos into one MP4. FFmpeg has two concat mechanisms and the classic trap is picking the wrong one, so `concat` exposes both behind a familiar `fast` / `precise` choice — plus `auto`, which probes the inputs and decides for you:
+
+```ts
+import { concat } from 'ffm-script'
+
+await concat(['intro.mp4', 'main.mp4', 'outro.mp4'], 'out.mp4', {
+  mode: 'auto', // 'fast' | 'precise' | 'auto' (default)
+  onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`),
+})
+```
+
+| Mode | Mechanism | Re-encode? | Constraint |
+| --- | --- | --- | --- |
+| `fast` | concat demuxer (`-c copy`) | No, fast | Inputs must share the same codecs/resolution/parameters, or the output is corrupt |
+| `precise` | concat filter (`-filter_complex concat`) | Yes, slower | Handles heterogeneous inputs |
+| `auto` | probes the inputs | When needed | Picks `fast` for compatible inputs, `precise` otherwise |
+
+`precise` needs every input to agree on whether it carries an audio track (all or none); mixing the two throws `InvalidOptionsError`.
+
 ### Raw FFmpeg — `run`
 
 The escape hatch for anything the typed operations don't cover. Pass an arbitrary argument list straight to `ffmpeg` and still get progress parsing, cancellation, timeout and the typed error hierarchy. Arguments are forwarded verbatim — you own the inputs, the output, and any `-y` to overwrite:

@@ -1,8 +1,9 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm } from 'node:fs/promises';
 import { cpus, tmpdir } from 'node:os';
 import { extname, join } from 'node:path';
 import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
+import { concatDemuxer } from '../core/concat.js';
 import { validateInput } from '../core/validate.js';
 import { resolveKeyframes } from '../core/keyframes.js';
 import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
@@ -113,7 +114,7 @@ export async function parallelConvert(
 
     await Promise.all([
       transcodeSegments(input, segments, workDir, totalDuration, workers, options).then((chunks) =>
-        concatChunks(chunks, workDir, videoTarget, options.signal),
+        concatDemuxer(chunks, videoTarget, options.signal !== undefined ? { signal: options.signal } : {}),
       ),
       audioTrack !== undefined ? encodeAudio(input, audioTrack, options.signal) : Promise.resolve(),
     ]);
@@ -194,23 +195,6 @@ async function runPool<T>(
     }
   });
   await Promise.all(lanes);
-}
-
-/** Joins the chunks with the concat demuxer (no re-encode). */
-async function concatChunks(
-  chunks: string[],
-  workDir: string,
-  output: string,
-  signal: AbortSignal | undefined,
-): Promise<void> {
-  const listFile = join(workDir, 'chunks.txt');
-  await writeFile(listFile, chunks.map((path) => `file '${path}'`).join('\n'), 'utf8');
-
-  await spawnFFmpeg({
-    binary: resolveBinary('ffmpeg'),
-    args: ['-f', 'concat', '-safe', '0', '-i', listFile, '-c', 'copy', '-y', output],
-    ...(signal !== undefined ? { signal } : {}),
-  });
 }
 
 /** Encodes the whole audio track in a single pass (no junctions → no drift). */
