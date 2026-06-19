@@ -134,6 +134,21 @@ describe('parallelConvert', () => {
     expect(Math.max(...percents)).toBeGreaterThan(90);
   }, 60_000);
 
+  it('scales every chunk to the requested width while preserving the aspect ratio', async () => {
+    const output = join(dir, 'out-scaled.mp4');
+    // Many workers → many chunks, all of which must land on the same resolution
+    // for the concat demuxer to stream-copy the joins. A mismatch would corrupt
+    // the output or trip ffprobe; a uniform 640x360 across the full length proves
+    // the scale filter is applied identically to each chunk.
+    await parallelConvert(SAMPLE, output, { workers: 4, width: 640 });
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.video?.width).toBe(640);
+    expect(info.video?.height).toBe(360); // aspect ratio preserved via -2
+    expect(info.duration).toBeCloseTo(10, 0); // joins held across resolutions
+  }, 60_000);
+
   it('falls back to frame-boundary cuts for an all-intra input (no stss box)', async () => {
     const allIntra = join(dir, 'allintra.mp4');
     // -g 1 makes every frame a keyframe; the muxer omits the stss box.

@@ -165,6 +165,10 @@ export interface ParallelConvertOptions {
   targetBitrate?: string;
   /** Semantic quality preset (CRF + speed). Mutually exclusive with `targetBitrate`. */
   quality?: Quality;
+  /** Output width in pixels. If only one dimension is set, aspect ratio is preserved. */
+  width?: number;
+  /** Output height in pixels. If only one dimension is set, aspect ratio is preserved. */
+  height?: number;
   /** Called with aggregated progress across all workers. */
   onProgress?: (progress: Progress) => void;
   /** Aborts the operation; the returned promise rejects with an `AbortError`. */
