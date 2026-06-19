@@ -4,6 +4,7 @@ export { convert } from './operations/convert.js';
 export { trim } from './operations/trim.js';
 export { extractAudio } from './operations/extract.js';
 export { thumbnail } from './operations/thumbnail.js';
+export { overlay } from './operations/overlay.js';
 export { run } from './operations/run.js';
 export { concat } from './operations/concat.js';
 export { toHLS } from './operations/hls.js';

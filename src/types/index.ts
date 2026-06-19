@@ -175,6 +175,32 @@ export interface ParallelConvertOptions {
   signal?: AbortSignal;
 }
 
+/** Where a watermark is anchored within the frame. */
+export type OverlayPosition =
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right'
+  | 'center';
+
+/** Options for {@link overlay}. */
+export interface OverlayOptions {
+  /** Path to the overlay image (PNG, JPEG or WebP). */
+  watermark: string;
+  /** Corner (or centre) the watermark is anchored to. Defaults to `'bottom-right'`. */
+  position?: OverlayPosition;
+  /** Gap in pixels between the watermark and the frame edges. Ignored for `'center'`. Defaults to `10`. */
+  margin?: number;
+  /** Watermark opacity in [0, 1]. Defaults to `1` (fully opaque). */
+  opacity?: number;
+  /** Scale the watermark to this width in pixels (height preserves aspect ratio). Omitted → native size. */
+  width?: number;
+  /** Called with progress updates as the overlay advances. */
+  onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+}
+
 /** Options for {@link concat}. */
 export interface ConcatOptions {
   /**

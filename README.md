@@ -205,6 +205,25 @@ await concat(['intro.mp4', 'main.mp4', 'outro.mp4'], 'out.mp4', {
 
 `precise` needs every input to agree on whether it carries an audio track (all or none); mixing the two throws `InvalidOptionsError`.
 
+### Watermark — `overlay`
+
+Burn an image (PNG/JPEG/WebP) onto a video. Anchor it to a corner or the centre, inset it from the edges, fade it, and scale it. The video is re-encoded; the audio is copied through untouched:
+
+```ts
+import { overlay } from 'ffm-script'
+
+await overlay('input.mp4', 'output.mp4', {
+  watermark: 'logo.png',
+  position: 'bottom-right', // 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center'
+  margin: 20,               // px from the edges (ignored for 'center'); default 10
+  opacity: 0.6,             // 0–1; default 1 (opaque)
+  width: 160,               // scale the watermark; height preserves aspect ratio
+  onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`),
+})
+```
+
+Only `watermark` is required — it defaults to a fully opaque logo in the bottom-right corner at its native size.
+
 ### Raw FFmpeg — `run`
 
 The escape hatch for anything the typed operations don't cover. Pass an arbitrary argument list straight to `ffmpeg` and still get progress parsing, cancellation, timeout and the typed error hierarchy. Arguments are forwarded verbatim — you own the inputs, the output, and any `-y` to overwrite:
