@@ -73,6 +73,22 @@ await convert('input.mp4', 'output.mp4', {
 })
 ```
 
+#### Quality presets
+
+`convert`, `parallelConvert` and the chainable `.convert(...)` accept a semantic `quality` preset instead of fiddling with bitrates. Each maps to a libx264 CRF (the quality/size dial) and speed preset:
+
+```ts
+await convert('input.mp4', 'output.mp4', { quality: 'high' })
+```
+
+| Preset | FFmpeg | Use it for |
+| --- | --- | --- |
+| `high` | `-crf 18 -preset slow` | Visually lossless, larger files |
+| `balanced` | `-crf 23 -preset medium` | Sensible default trade-off |
+| `small` | `-crf 28 -preset medium` | Smaller files, lower quality |
+
+`quality` is **constant-quality** encoding, so it's mutually exclusive with an explicit video bitrate (`videoBitrate` / `targetBitrate`, which target a *size*) — setting both throws `InvalidOptionsError`. Pick one.
+
 ### Cut — `trim`
 
 ```ts
