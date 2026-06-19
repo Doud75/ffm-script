@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `overlay(input, output, options)`: burn a watermark image (PNG/JPEG/WebP) onto a video. Anchor it to a corner or the centre (`position`), inset it from the edges (`margin`), fade it (`opacity`), and scale it to a `width`. The video is re-encoded (`libx264`) while the audio is stream-copied unchanged; silent inputs are handled.
+
 ## [0.5.1] - 2026-06-19
 
 ### Added
