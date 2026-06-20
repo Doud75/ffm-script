@@ -6,6 +6,11 @@ export interface Stream {
   type: 'video' | 'audio' | 'subtitle' | 'data';
   /** Codec short name as reported by ffprobe (e.g. `'h264'`, `'aac'`). */
   codec: string;
+  /**
+   * Per-stream metadata tags as reported by ffprobe (e.g. `language`, `title`,
+   * `handler_name`). Empty when the stream carries none.
+   */
+  tags: Record<string, string>;
 }
 
 /** A video stream with its picture properties. */
@@ -48,6 +53,12 @@ export interface ProbeResult {
   video: VideoStream | null;
   /** The first audio stream, or `null` when there is none. */
   audio: AudioStream | null;
+  /**
+   * Container-level metadata tags as reported by ffprobe (e.g. `title`, `artist`,
+   * `album`, `comment`, `creation_time`). Empty when the file carries none. Write
+   * these back with {@link setMetadata}.
+   */
+  tags: Record<string, string>;
 }
 
 /**
@@ -281,6 +292,25 @@ export interface RunOptions {
   signal?: AbortSignal;
   /** Max run time in milliseconds; on overrun the process is killed (`FFmpegTimeoutError`). */
   timeout?: number;
+}
+
+/** Options for {@link setMetadata}. */
+export interface SetMetadataOptions {
+  /**
+   * Tags to write, as `key: value` pairs (e.g. `{ title: 'My Movie', artist: 'Me' }`).
+   * Keys are FFmpeg metadata keys (`title`, `artist`, `album`, `comment`,
+   * `copyright`, `creation_time`, …). They are layered on top of the input's
+   * existing tags, unless `clear` is set — then they are the only tags kept.
+   */
+  tags?: Record<string, string>;
+  /**
+   * Drop every existing tag from the input before writing `tags` (FFmpeg
+   * `-map_metadata -1`). With no `tags`, this strips all metadata — useful to
+   * anonymise a file. Defaults to `false`.
+   */
+  clear?: boolean;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
 }
 
 /** Progress information reported through an `onProgress` callback. */

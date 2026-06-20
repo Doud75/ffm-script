@@ -54,11 +54,36 @@ checkDependencies() // throws FFmpegNotFoundError if ffmpeg/ffprobe are missing
 import { probe } from 'ffm-script'
 
 const info = await probe('video.mp4')
-console.log(info.duration)     // 124.5 (seconds)
-console.log(info.video?.codec) // "h264"
-console.log(info.video?.width) // 1920
-console.log(info.audio?.codec) // "aac"
+console.log(info.duration)        // 124.5 (seconds)
+console.log(info.video?.codec)    // "h264"
+console.log(info.video?.width)    // 1920
+console.log(info.audio?.codec)    // "aac"
+console.log(info.tags.title)      // container metadata (title, artist, creation_time…)
+console.log(info.audio?.tags.language) // per-stream metadata (e.g. "eng")
 ```
+
+`tags` is a `Record<string, string>` of metadata. It's present at the top level (container tags such as `title`, `artist`, `album`, `creation_time`) and on every stream (per-track tags such as `language`), defaulting to an empty object when the file carries none. Write these tags back with [`setMetadata`](#read--write-metadata--setmetadata).
+
+### Read & write metadata — `setMetadata`
+
+Write or strip metadata tags. Streams are stream-copied (`-c copy`), so it's **lossless and near-instant** — editing tags never re-encodes the media:
+
+```ts
+import { setMetadata } from 'ffm-script'
+
+// Set tags on top of the existing metadata
+await setMetadata('input.mp4', 'output.mp4', {
+  tags: { title: 'My Movie', artist: 'Me', comment: 'Shot on location' },
+})
+
+// Replace: drop the input's tags first, keep only the new ones
+await setMetadata('input.mp4', 'output.mp4', { tags: { title: 'Clean' }, clear: true })
+
+// Strip everything (anonymise) — clear with no tags
+await setMetadata('input.mp4', 'output.mp4', { clear: true })
+```
+
+Keys are FFmpeg metadata keys (`title`, `artist`, `album`, `comment`, `copyright`, `creation_time`, …). Works on **audio-only files** (MP3/AAC/WAV/FLAC/M4A) as well as video. Use the same container for the output as the input so the stream copy stays valid. Calling it with neither `tags` nor `clear` is a no-op and throws `InvalidOptionsError`.
 
 ### Transcode — `convert`
 
