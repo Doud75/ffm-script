@@ -27,7 +27,7 @@ interface FfprobeStream {
   sample_rate?: string;
   channels?: number;
   bit_rate?: string;
-  tags?: { rotate?: string };
+  tags?: Record<string, string>;
   side_data_list?: { rotation?: number }[];
 }
 
@@ -35,6 +35,7 @@ interface FfprobeFormat {
   duration?: string;
   size?: string;
   bit_rate?: string;
+  tags?: Record<string, string>;
 }
 
 /**
@@ -96,6 +97,7 @@ export function parseProbeOutput(file: string, stdout: string): ProbeResult {
     streams: ffStreams.map(toStream),
     video: video !== undefined ? toVideoStream(video) : null,
     audio: audio !== undefined ? toAudioStream(audio) : null,
+    tags: toTags(parsed.format?.tags),
   };
 }
 
@@ -104,6 +106,7 @@ function toStream(stream: FfprobeStream): Stream {
     index: toNumber(stream.index),
     type: toStreamType(stream.codec_type),
     codec: stream.codec_name ?? '',
+    tags: toTags(stream.tags),
   };
 }
 
@@ -117,6 +120,7 @@ function toVideoStream(stream: FfprobeStream): VideoStream {
     fps: toFps(stream.avg_frame_rate ?? stream.r_frame_rate),
     bitrate: toNumber(stream.bit_rate),
     rotation: toRotation(stream),
+    tags: toTags(stream.tags),
   };
 }
 
@@ -128,7 +132,18 @@ function toAudioStream(stream: FfprobeStream): AudioStream {
     sampleRate: toNumber(stream.sample_rate),
     channels: toNumber(stream.channels),
     bitrate: toNumber(stream.bit_rate),
+    tags: toTags(stream.tags),
   };
+}
+
+/** Copies ffprobe's raw tag bag into a plain, fully-defined string→string map. */
+function toTags(tags: Record<string, string> | undefined): Record<string, string> {
+  const result: Record<string, string> = {};
+  if (tags === undefined) return result;
+  for (const [key, value] of Object.entries(tags)) {
+    if (value !== undefined && value !== null) result[key] = String(value);
+  }
+  return result;
 }
 
 function toStreamType(codecType: string | undefined): Stream['type'] {

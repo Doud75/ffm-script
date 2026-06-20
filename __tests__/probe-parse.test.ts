@@ -96,6 +96,46 @@ describe('parseProbeOutput', () => {
     expect(result.streams[0]?.type).toBe('data');
   });
 
+  it('reads container-level tags from the format block', () => {
+    const result = parseProbeOutput(
+      FILE,
+      payload([], { tags: { title: 'My Movie', artist: 'Me', comment: 'hi' } }),
+    );
+
+    expect(result.tags).toEqual({ title: 'My Movie', artist: 'Me', comment: 'hi' });
+  });
+
+  it('reads per-stream tags (e.g. language on an audio track)', () => {
+    const result = parseProbeOutput(
+      FILE,
+      payload([
+        { codec_type: 'video', codec_name: 'h264', tags: { rotate: '90' } },
+        { codec_type: 'audio', codec_name: 'aac', tags: { language: 'eng', title: 'Stereo' } },
+      ]),
+    );
+
+    expect(result.video?.tags).toMatchObject({ rotate: '90' });
+    expect(result.audio?.tags).toEqual({ language: 'eng', title: 'Stereo' });
+    expect(result.streams[1]?.tags).toEqual({ language: 'eng', title: 'Stereo' });
+  });
+
+  it('defaults tags to an empty object when absent', () => {
+    const result = parseProbeOutput(FILE, payload([{ codec_type: 'video' }]));
+
+    expect(result.tags).toEqual({});
+    expect(result.video?.tags).toEqual({});
+    expect(result.streams[0]?.tags).toEqual({});
+  });
+
+  it('coerces non-string tag values to strings', () => {
+    const result = parseProbeOutput(
+      FILE,
+      payload([], { tags: { track: 3 } as unknown as Record<string, string> }),
+    );
+
+    expect(result.tags.track).toBe('3');
+  });
+
   it('throws InvalidFormatError on unparseable output', () => {
     expect(() => parseProbeOutput(FILE, 'not json')).toThrow(InvalidFormatError);
   });

@@ -4,6 +4,16 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-06-20
+
+### Added
+
+- `setMetadata(input, output, options)`: write or strip container-level metadata tags (`title`, `artist`, `album`, `comment`, `copyright`, `creation_time`, …). Pass `tags` to set them on top of the existing metadata, or `clear: true` to drop the input's tags first — with no `tags`, this strips everything (handy to anonymise a file). Streams are stream-copied (`-c copy`), so editing tags is lossless and near-instant — it never re-encodes the media.
+
+### Changed
+
+- `probe` now reports metadata tags: a `tags` record at the top level (container metadata such as `title`/`artist`/`creation_time`) and a `tags` record on every stream (per-track metadata such as `language`). Both default to an empty object when absent. Purely additive — existing fields are unchanged.
+
 ## [0.7.0] - 2026-06-20
 
 ### Changed
@@ -85,6 +95,7 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
+[0.8.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.8.0
 [0.7.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.6.0
 [0.5.1]: https://github.com/Doud75/ffm-script/releases/tag/v0.5.1
