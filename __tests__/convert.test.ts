@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { convert } from '../src/operations/convert.js';
 import { probe } from '../src/operations/probe.js';
-import { FileNotFoundError, InvalidFormatError } from '../src/errors/index.js';
+import { FileNotFoundError, InvalidFormatError, InvalidOptionsError } from '../src/errors/index.js';
 import { SAMPLE } from './helpers.js';
 
 describe('convert', () => {
@@ -52,8 +52,48 @@ describe('convert', () => {
     );
   });
 
-  it('throws InvalidFormatError when the output is not an .mp4', async () => {
-    await expect(convert(input, join(dir, 'out.mkv'))).rejects.toBeInstanceOf(InvalidFormatError);
+  it('writes a MOV with the default h264/aac codecs', async () => {
+    const output = join(dir, 'out.mov');
+    await convert(input, output);
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.audio?.codec).toBe('aac');
+  }, 30_000);
+
+  it('writes an MKV with the default h264/aac codecs', async () => {
+    const output = join(dir, 'out.mkv');
+    await convert(input, output);
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.audio?.codec).toBe('aac');
+  }, 30_000);
+
+  it('writes a WebM with container-aware vp9/opus defaults', async () => {
+    const output = join(dir, 'out.webm');
+    await convert(input, output, { width: 320 }); // smaller frame keeps vp9 fast
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('vp9');
+    expect(info.audio?.codec).toBe('opus');
+    expect(info.duration).toBeCloseTo(10, 0);
+  }, 60_000);
+
+  it('throws InvalidFormatError for an unsupported output container', async () => {
+    await expect(convert(input, join(dir, 'out.avi'))).rejects.toBeInstanceOf(InvalidFormatError);
+  });
+
+  it('throws InvalidFormatError for a codec the container cannot carry', async () => {
+    await expect(
+      convert(input, join(dir, 'bad.webm'), { videoCodec: 'libx264' }),
+    ).rejects.toBeInstanceOf(InvalidFormatError);
+  });
+
+  it('throws InvalidOptionsError when a quality preset is used with a non-CRF codec', async () => {
+    await expect(
+      convert(input, join(dir, 'q.webm'), { quality: 'high' }),
+    ).rejects.toBeInstanceOf(InvalidOptionsError);
   });
 
   it('rejects with an AbortError when the signal is aborted', async () => {

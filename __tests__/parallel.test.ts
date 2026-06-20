@@ -221,8 +221,33 @@ describe('parallelConvert', () => {
     );
   });
 
-  it('throws InvalidFormatError when the output is not an .mp4', async () => {
-    await expect(parallelConvert(SAMPLE, join(dir, 'x.mkv'))).rejects.toBeInstanceOf(
+  it('writes an MKV output by stream-copying the h264/aac joins', async () => {
+    const output = join(dir, 'out-container.mkv');
+    await parallelConvert(SAMPLE, output, { workers: 4, targetBitrate: '800k' });
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.audio?.codec).toBe('aac');
+    expect(info.duration).toBeCloseTo(10, 0);
+  }, 60_000);
+
+  it('writes a MOV output', async () => {
+    const output = join(dir, 'out-container.mov');
+    await parallelConvert(SAMPLE, output, { workers: 4, targetBitrate: '800k' });
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.duration).toBeCloseTo(10, 0);
+  }, 60_000);
+
+  it('throws InvalidFormatError for a WebM output (copy pipeline produces h264/aac)', async () => {
+    await expect(parallelConvert(SAMPLE, join(dir, 'x.webm'))).rejects.toBeInstanceOf(
+      InvalidFormatError,
+    );
+  });
+
+  it('throws InvalidFormatError for an unsupported output container', async () => {
+    await expect(parallelConvert(SAMPLE, join(dir, 'x.avi'))).rejects.toBeInstanceOf(
       InvalidFormatError,
     );
   });

@@ -1,11 +1,12 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { cpus, tmpdir } from 'node:os';
-import { extname, join } from 'node:path';
+import { join } from 'node:path';
 import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
 import { concatDemuxer } from '../core/concat.js';
 import { qualityArgs, assertQualityBitrateExclusive } from '../core/quality.js';
 import { buildScaleFilter } from '../core/scale.js';
+import { resolveOutputContainer } from '../core/container.js';
 import { validateInput } from '../core/validate.js';
 import { resolveKeyframes } from '../core/keyframes.js';
 import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
@@ -77,13 +78,16 @@ export function aggregateProgress(processedBySegment: number[], totalDuration: n
  * re-encoding. Boundaries land on keyframes, so the joins are artefact-free.
  *
  * Accepts MP4, MOV, WebM and MKV inputs — keyframes come from the ISOBMFF `stss`
- * box when available, otherwise from ffprobe. Output is always MP4.
+ * box when available, otherwise from ffprobe. Output is MP4, MOV or MKV (chosen
+ * from the output extension); the chunks are re-encoded to h264 and the audio to
+ * aac, then joined with stream copy — codecs WebM cannot carry, so WebM output is
+ * rejected (use {@link convert} for WebM).
  *
  * @param input - Path to the source video (MP4/MOV/WebM/MKV).
- * @param output - Path to the destination MP4 file.
+ * @param output - Path to the destination file; its extension picks the container (`.mp4`/`.mov`/`.mkv`).
  * @param options - Worker count, target bitrate/quality, output resolution, and progress/abort options.
  * @throws {FileNotFoundError} when `input` does not exist.
- * @throws {InvalidFormatError} when `input` is not a supported video container, `output` is not MP4, or the input has no video keyframes.
+ * @throws {InvalidFormatError} when `input` is not a supported video container, the output extension is unsupported or WebM, or the input has no video keyframes.
  * @throws {InvalidOptionsError} when `workers` is not a positive integer.
  * @throws {FFmpegError} when any FFmpeg process exits non-zero.
  */
@@ -93,8 +97,12 @@ export async function parallelConvert(
   options: ParallelConvertOptions = {},
 ): Promise<void> {
   await validateInput(input, VIDEO_INPUT_FORMATS);
-  if (extname(output).toLowerCase() !== '.mp4') {
-    throw new InvalidFormatError(output, 'output must be an .mp4 file');
+  const { container } = resolveOutputContainer(output);
+  if (container === 'webm') {
+    throw new InvalidFormatError(
+      output,
+      'parallelConvert cannot output WebM: its copy-based concat/mux pipeline produces h264/aac; use convert() for WebM',
+    );
   }
   assertQualityBitrateExclusive(options.quality, options.targetBitrate);
 
