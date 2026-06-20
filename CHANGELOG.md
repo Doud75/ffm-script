@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-06-20
+
+### Changed
+
+- `convert` now writes **MOV, MKV and WebM** in addition to MP4 — the output container is chosen from the output extension. Codecs default to the container's natural pair (`libx264`/`aac` for MP4/MOV/MKV, `libvpx-vp9`/`libopus` for WebM) when not given. An explicit codec the container can't carry (e.g. h264 into WebM) is rejected with `InvalidFormatError`, and the x264/x265-only `quality` presets throw `InvalidOptionsError` when paired with a non-CRF codec. Video output is no longer MP4-only.
+- `parallelConvert` now writes **MOV and MKV** in addition to MP4 (chosen from the output extension). WebM is rejected with a clear `InvalidFormatError`: the parallel pipeline re-encodes chunks to h264 and stream-copies the joins, which WebM cannot carry — use `convert` for WebM.
+
 ## [0.6.0] - 2026-06-19
 
 ### Added
@@ -78,6 +85,7 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
+[0.7.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.7.0
 [0.6.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.6.0
 [0.5.1]: https://github.com/Doud75/ffm-script/releases/tag/v0.5.1
 [0.5.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.5.0

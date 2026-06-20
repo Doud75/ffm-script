@@ -66,12 +66,28 @@ console.log(info.audio?.codec) // "aac"
 import { convert } from 'ffm-script'
 
 await convert('input.mp4', 'output.mp4', {
-  videoCodec: 'libx264', // default
+  videoCodec: 'libx264', // default for MP4/MOV/MKV
   audioBitrate: '192k',
   width: 1280,           // height auto-scaled to preserve aspect ratio
   onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`),
 })
 ```
+
+#### Output container
+
+The output container is chosen from the **output extension** — no extra option. Codecs default to the container's natural pair when you don't pass `videoCodec`/`audioCodec`:
+
+```ts
+await convert('input.mp4', 'output.webm') // → VP9 + Opus, no config needed
+await convert('input.mp4', 'output.mkv')  // → h264 + AAC
+```
+
+| Extension | Default video | Default audio |
+| --- | --- | --- |
+| `.mp4` / `.mov` / `.mkv` | `libx264` (h264) | `aac` |
+| `.webm` | `libvpx-vp9` (vp9) | `libopus` (opus) |
+
+An explicit codec the container can't carry (e.g. `videoCodec: 'libx264'` with `.webm`) throws `InvalidFormatError`. MKV accepts any codec. `parallelConvert` writes `.mp4`/`.mov`/`.mkv` (not `.webm` — its copy-based join produces h264/aac; use `convert` for WebM).
 
 #### Quality presets
 
@@ -183,6 +199,8 @@ await parallelConvert('input.mp4', 'output.mp4', {
 `workers` is optional. It defaults to **half the host's logical cores** (at least 1) so the machine stays usable during the transcode — each FFmpeg worker is itself multithreaded, so one worker per core would oversubscribe the CPU. A value above the core count is capped to it.
 
 `width` / `height` resize the output just like [`convert`](#transcode--convert) — set one to preserve the aspect ratio, or both to force exact dimensions. The same scale is applied to every chunk, so the joins stay artefact-free.
+
+The output container follows the extension — `.mp4`, `.mov` or `.mkv`. WebM is rejected: chunks are re-encoded to h264 and stream-copied at the joins, which WebM can't carry — use [`convert`](#output-container) for WebM.
 
 ### Concatenate files — `concat`
 
