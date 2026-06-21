@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import type { Readable, Writable } from 'node:stream';
 import { FFmpegError, FFmpegTimeoutError } from '../errors/index.js';
 import type { Progress } from '../types/index.js';
 
@@ -86,6 +87,159 @@ export function spawnFFmpeg(options: SpawnOptions): Promise<string> {
 
     signal?.addEventListener('abort', onAbort, { once: true });
   });
+}
+
+export interface StreamSpawnOptions {
+  /** Absolute path to the binary to run (resolved via `resolveBinary`). */
+  binary: string;
+  /** Arguments passed verbatim to the binary (use `pipe:0`/`pipe:1` for the piped ends). */
+  args: string[];
+  /** Piped into the process's stdin. The args must read it (`-i pipe:0`). */
+  input?: Readable;
+  /** The process's stdout is piped here. The args must write to it (`pipe:1`). */
+  output?: Writable;
+  /** Total media duration in seconds, used to compute the progress percentage. */
+  duration?: number;
+  /** Called whenever FFmpeg reports progress on stderr. */
+  onProgress?: (progress: Progress) => void;
+  /** Cancels the run; the promise rejects with an `AbortError` DOMException. */
+  signal?: AbortSignal;
+  /** Max run time in milliseconds; on overrun the process is killed and rejects with `FFmpegTimeoutError`. */
+  timeout?: number;
+}
+
+/**
+ * Runs an FFmpeg process wired to Node streams, **without buffering stdout** —
+ * the data flows straight from `input` through FFmpeg to `output`, keeping the
+ * memory footprint bounded regardless of file size.
+ *
+ * Same guarantees as {@link spawnFFmpeg} (progress, abort, timeout, typed
+ * errors), but resolves with `void`: the bytes go to `output`, not the promise.
+ * Resolves once the process exits 0 **and** `output` has flushed; rejects with
+ * {@link FFmpegError} on a non-zero exit, or with the underlying error if a
+ * stream fails.
+ */
+export function spawnFFmpegStream(options: StreamSpawnOptions): Promise<void> {
+  const { binary, args, input, output, duration, onProgress, signal, timeout } = options;
+
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted === true) {
+      // Nothing ran, so tear down the caller's streams. Swallow their teardown
+      // errors (e.g. a sink whose lazy open later fails): the promise already
+      // rejects with AbortError, so that noise must not crash the process.
+      input?.on('error', noop).destroy();
+      output?.on('error', noop).destroy();
+      reject(abortError());
+      return;
+    }
+
+    const child = spawn(binary, args);
+    let stderr = '';
+    let settled = false;
+    let timer: NodeJS.Timeout | undefined;
+
+    let exited = false;
+    let exitCode: number | null = null;
+    // Nothing to flush when there is no output sink.
+    let outputFlushed = output === undefined;
+
+    const cleanup = (): void => {
+      if (timer !== undefined) clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+    };
+
+    const fail = (err: Error): void => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      input?.destroy();
+      output?.destroy();
+      child.kill('SIGKILL');
+      reject(err);
+    };
+
+    // Resolves only once the process has exited cleanly and the sink has drained.
+    const maybeResolve = (): void => {
+      if (settled || !exited) return;
+      if (exitCode !== 0) {
+        settled = true;
+        cleanup();
+        input?.destroy();
+        output?.destroy();
+        reject(new FFmpegError(stderr, exitCode ?? 1));
+        return;
+      }
+      if (!outputFlushed) return;
+      settled = true;
+      cleanup();
+      resolve();
+    };
+
+    function onAbort(): void {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      input?.destroy();
+      output?.destroy();
+      child.kill('SIGTERM');
+      reject(abortError());
+    }
+
+    if (input !== undefined) {
+      input.on('error', fail);
+      // FFmpeg may close stdin early (e.g. it has read enough); the resulting
+      // EPIPE is expected — the real outcome is the process exit code.
+      child.stdin.on('error', (err: NodeJS.ErrnoException) => {
+        if (err.code === 'EPIPE') return;
+        fail(err);
+      });
+      input.pipe(child.stdin);
+    }
+
+    if (output !== undefined) {
+      output.on('error', fail);
+      output.on('finish', () => {
+        outputFlushed = true;
+        maybeResolve();
+      });
+      child.stdout.pipe(output);
+    } else {
+      // Drain stdout so backpressure never stalls FFmpeg when no sink is attached.
+      child.stdout.resume();
+    }
+
+    child.stderr.on('data', (chunk: Buffer) => {
+      const text = chunk.toString();
+      stderr += text;
+      reportProgress(text, duration, onProgress);
+    });
+
+    child.on('error', fail);
+
+    child.on('close', (code) => {
+      exited = true;
+      exitCode = code;
+      maybeResolve();
+    });
+
+    if (timeout !== undefined) {
+      timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        input?.destroy();
+        output?.destroy();
+        child.kill('SIGKILL');
+        reject(new FFmpegTimeoutError(timeout));
+      }, timeout);
+    }
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
+function noop(): void {
+  /* swallow */
 }
 
 function abortError(): DOMException {

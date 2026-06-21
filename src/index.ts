@@ -8,7 +8,7 @@ export { overlay } from './operations/overlay.js';
 export { extractSubtitles, burnSubtitles } from './operations/subtitles.js';
 export { toAnimation } from './operations/animation.js';
 export { setMetadata } from './operations/metadata.js';
-export { run } from './operations/run.js';
+export { run, runStream } from './operations/run.js';
 export { concat } from './operations/concat.js';
 export { toHLS } from './operations/hls.js';
 export { ffmscript, FfmScriptChain } from './operations/chain.js';
