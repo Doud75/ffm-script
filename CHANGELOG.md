@@ -4,13 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.10.0] - 2026-06-21
 
 ### Added
 
 - Bundled **Claude Code skill** (`skill/SKILL.md`, shipped in the npm package): teaches the assistant the library's exact public API — signatures, option names, format/output constraints, the typed error hierarchy and recipes — so it stops guessing or hallucinating options. Versioned with the package, so it always matches the installed API. Copy it into a consuming project's `.claude/skills/` to use it (see the README).
 
-## [0.9.0] - 2026-06-20
+## [0.9.0] - 2026-06-21
 
 ### Added
 
@@ -107,6 +107,7 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
+[0.10.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.10.0
 [0.9.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.8.0
 [0.7.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.7.0
