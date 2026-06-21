@@ -409,6 +409,19 @@ try {
 
 **Inputs are validated before FFmpeg is ever spawned** (file existence, extension, timestamps), so you get fast, typed errors instead of parsing FFmpeg's stderr.
 
+## Claude Code skill
+
+The package ships a [Claude Code](https://claude.com/claude-code) **skill** (`skill/SKILL.md`) that teaches the assistant this library's exact API — signatures, option names, format constraints, the typed error hierarchy and ready-made recipes — so it stops guessing or hallucinating options. It's versioned with the package, so it always matches the API you installed.
+
+To use it in a project that depends on `ffm-script`, copy the skill into your Claude Code skills folder:
+
+```sh
+mkdir -p .claude/skills/ffm-script
+cp node_modules/ffm-script/skill/SKILL.md .claude/skills/ffm-script/
+```
+
+Claude Code then loads it automatically when you work with `ffm-script` code.
+
 ## License
 
 MIT

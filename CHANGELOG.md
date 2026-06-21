@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Bundled **Claude Code skill** (`skill/SKILL.md`, shipped in the npm package): teaches the assistant the library's exact public API — signatures, option names, format/output constraints, the typed error hierarchy and recipes — so it stops guessing or hallucinating options. Versioned with the package, so it always matches the installed API. Copy it into a consuming project's `.claude/skills/` to use it (see the README).
+
 ## [0.9.0] - 2026-06-20
 
 ### Added
