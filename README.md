@@ -325,6 +325,30 @@ await run(['-i', 'input.mp4', '-vf', 'scale=1280:-2', '-crf', '18', '-y', 'out.m
 
 For a progress percentage, pass the media `duration` — the input is **not** auto-probed, since there's no reliable way to tell which token is the input in a free-form argument list. Without it the run still works, it just emits no progress.
 
+### Streaming — `runStream`
+
+The streaming counterpart to [`run`](#raw-ffmpeg--run), for very large files. Pipe a Node `Readable` into FFmpeg's stdin and/or its stdout into a `Writable` — the data flows **straight through the process without being buffered in memory**, so the footprint stays bounded whatever the file size. Reference the piped ends as `pipe:0` / `pipe:1` in the args:
+
+```ts
+import { runStream } from 'ffm-script'
+import { createReadStream, createWriteStream } from 'node:fs'
+
+await runStream(
+  ['-i', 'pipe:0', '-c:v', 'libx264', '-movflags', 'frag_keyframe+empty_moov', '-f', 'mp4', 'pipe:1'],
+  {
+    input: createReadStream('big.mov'),
+    output: createWriteStream('out.mp4'),
+    onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`), // needs duration
+  },
+)
+```
+
+`input` and `output` are both optional — omit either to read from / write to a file path in the args instead. Common cases: transcode an incoming HTTP upload to a response (`{ input: req, output: res }`), or read a file and stream the result somewhere.
+
+> **Pipes can't seek.** FFmpeg can't rewind a stream, so the args must use a *streamable* format: a streamable container (MPEG-TS, Matroska) or **fragmented MP4** (`-movflags frag_keyframe+empty_moov`) for piped output, and a linearly-decodable input for piped input. A plain `moov`-at-end MP4 can be neither read from nor written to a pipe. This is the same escape-hatch contract as `run` — you own the args.
+
+It resolves once the process exits **and** the sink has flushed; it rejects with `FFmpegError` on a non-zero exit (or the underlying error if a stream fails), and supports `signal` and `timeout` like every other operation.
+
 ## Progress
 
 `convert` and `trim` accept an `onProgress` callback. The percentage is parsed from FFmpeg's output against the known duration:

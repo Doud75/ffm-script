@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `runStream(args, options)`: streaming counterpart to `run` — pipe a Node `Readable` into FFmpeg's stdin and/or its stdout into a `Writable` (referenced as `pipe:0`/`pipe:1` in the args). Data flows straight through the process **without being buffered in memory**, so very large files are handled with a bounded footprint. Keeps the full engine (progress, `AbortSignal`, timeout, typed errors) and resolves once the process exits and the sink has flushed. Because a pipe isn't seekable, the args must use a streamable format (MPEG-TS, Matroska, or fragmented MP4 via `-movflags frag_keyframe+empty_moov`).
+
 ## [0.8.0] - 2026-06-20
 
 ### Added

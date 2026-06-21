@@ -1,3 +1,5 @@
+import type { Readable, Writable } from 'node:stream';
+
 /** A single media stream within a file. */
 export interface Stream {
   /** Zero-based position of the stream in the container. */
@@ -284,6 +286,40 @@ export interface RunOptions {
    * percentage. The input is **not** auto-probed: in a free-form argument list
    * there is no reliable way to tell which token is the input. Omit it and no
    * progress events are emitted (the run still works); provide it to get `percent`.
+   */
+  duration?: number;
+  /** Called with progress updates as the run advances. Requires `duration`. */
+  onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+  /** Max run time in milliseconds; on overrun the process is killed (`FFmpegTimeoutError`). */
+  timeout?: number;
+}
+
+/**
+ * Options for {@link runStream}, the streaming raw FFmpeg escape hatch.
+ *
+ * Data flows straight through the process without being buffered in memory, so
+ * the footprint stays bounded whatever the file size. Because a pipe is **not
+ * seekable**, the args must use a streamable format: a streamable container
+ * (MPEG-TS, Matroska) or fragmented MP4 (`-movflags frag_keyframe+empty_moov`)
+ * for piped output, and a linearly-decodable input for piped input.
+ */
+export interface RunStreamOptions {
+  /**
+   * Source piped into FFmpeg's stdin. Reference it in `args` as `pipe:0` (or `-`),
+   * e.g. `['-i', 'pipe:0', …]`. Omit to read from a file path in `args` instead.
+   */
+  input?: Readable;
+  /**
+   * Sink FFmpeg's stdout is piped into. Reference it in `args` as `pipe:1`,
+   * e.g. `[…, 'pipe:1']`. Omit to write to a file path in `args` instead.
+   */
+  output?: Writable;
+  /**
+   * Total media duration in seconds, used to turn FFmpeg's `time=` output into a
+   * percentage. The input is **not** auto-probed (a stream can't be re-read).
+   * Omit it and no progress events are emitted; provide it to get `percent`.
    */
   duration?: number;
   /** Called with progress updates as the run advances. Requires `duration`. */
