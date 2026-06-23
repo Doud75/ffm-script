@@ -409,18 +409,28 @@ try {
 
 **Inputs are validated before FFmpeg is ever spawned** (file existence, extension, timestamps), so you get fast, typed errors instead of parsing FFmpeg's stderr.
 
-## Claude Code skill
+## AI agent skill
 
-The package ships a [Claude Code](https://claude.com/claude-code) **skill** (`skill/SKILL.md`) that teaches the assistant this library's exact API — signatures, option names, format constraints, the typed error hierarchy and ready-made recipes — so it stops guessing or hallucinating options. It's versioned with the package, so it always matches the API you installed.
+The package ships an **Agent Skill** (`skills/ffm-script/SKILL.md`) that teaches your AI coding agent this library's exact API — signatures, option names, format constraints, the typed error hierarchy and ready-made recipes — so it stops guessing or hallucinating options. It uses the shared [Agent Skills](https://github.com/vercel-labs/skills) format, so the same skill works with Claude Code, Codex, Cursor and 70+ other agents.
 
-To use it in a project that depends on `ffm-script`, copy the skill into your Claude Code skills folder:
+### Install with the `skills` CLI (recommended)
+
+The cross-agent installer pulls the skill straight from GitHub and drops it into the right folder for whichever agent you use:
+
+```sh
+npx skills add Doud75/ffm-script
+```
+
+### Manual install (from your installed dependency)
+
+If you prefer to use the copy versioned with the package you installed (always matching your API version), copy `SKILL.md` into your agent's skills folder, e.g. for Claude Code:
 
 ```sh
 mkdir -p .claude/skills/ffm-script
-cp node_modules/ffm-script/skill/SKILL.md .claude/skills/ffm-script/
+cp node_modules/ffm-script/skills/ffm-script/SKILL.md .claude/skills/ffm-script/
 ```
 
-Claude Code then loads it automatically when you work with `ffm-script` code.
+For Codex or Cursor, use `.agents/skills/ffm-script/` instead. The agent then loads it automatically when you work with `ffm-script` code.
 
 ## License
 

@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2026-06-23
+
+### Changed
+
+- The bundled agent skill is now installable with the cross-agent [`skills` CLI](https://github.com/vercel-labs/skills): run `npx skills add Doud75/ffm-script` to drop it into the right folder for Claude Code, Codex, Cursor and 70+ other agents. The skill moved from `skill/SKILL.md` to `skills/ffm-script/SKILL.md` (the shared Agent Skills layout the CLI expects) and ships under `skills/` in the npm package. Skill content is unchanged; manual install paths in the README were updated accordingly.
+
 ## [0.10.0] - 2026-06-21
 
 ### Added
