@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import * as api from '../src/index.js';
 
-const SKILL_PATH = join(process.cwd(), 'skill', 'SKILL.md');
+const SKILL_PATH = join(process.cwd(), 'skills', 'ffm-script', 'SKILL.md');
 const skill = readFileSync(SKILL_PATH, 'utf8');
 
 /** Splits the YAML frontmatter block from the markdown body. */
