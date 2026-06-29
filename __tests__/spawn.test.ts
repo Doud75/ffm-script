@@ -69,6 +69,12 @@ describe('spawnFFmpeg', () => {
     ).rejects.toMatchObject({ name: 'AbortError' });
   });
 
+  it('rejects with the underlying error when the binary cannot be spawned', async () => {
+    await expect(spawnFFmpeg({ binary: '/no/such/binary-xyz', args: [] })).rejects.toMatchObject({
+      code: 'ENOENT',
+    });
+  });
+
   it('reports progress parsed from stderr time= lines', async () => {
     const percents: number[] = [];
     await spawnFFmpeg({

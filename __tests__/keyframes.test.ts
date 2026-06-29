@@ -1,9 +1,10 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { extractKeyframeIndex } from '../src/core/mp4.js';
-import { resolveKeyframes } from '../src/core/keyframes.js';
+import { resolveKeyframes, probeKeyframes } from '../src/core/keyframes.js';
+import { FFmpegError, InvalidFormatError } from '../src/errors/index.js';
 import { SAMPLE } from './helpers.js';
 
 /** Asserts a ~1s-spaced keyframe index for a 10s/-g 30 transcode of SAMPLE. */
@@ -75,6 +76,52 @@ describe('extractKeyframeIndex', () => {
       }
       expect(keyframes[keyframes.length - 1]!.timestamp).toBeLessThan(10);
     });
+  });
+});
+
+describe('resolveKeyframes fallbacks', () => {
+  let dir: string;
+  let audioOnly: string;
+
+  beforeAll(() => {
+    dir = mkdtempSync(join(tmpdir(), 'ffm-kf-fallback-'));
+    audioOnly = join(dir, 'audio.m4a');
+    execFileSync('ffmpeg', [
+      '-y',
+      '-loglevel',
+      'error',
+      '-i',
+      SAMPLE,
+      '-vn',
+      '-c:a',
+      'aac',
+      audioOnly,
+    ]);
+  });
+
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('rethrows a non-InvalidFormatError from the ISOBMFF parser (e.g. missing file)', async () => {
+    // A missing .mp4 makes extractKeyframeIndex fail with ENOENT, not an
+    // InvalidFormatError — that must propagate, not silently fall back.
+    await expect(resolveKeyframes(join(dir, 'nope.mp4'))).rejects.not.toBeInstanceOf(
+      InvalidFormatError,
+    );
+    await expect(resolveKeyframes(join(dir, 'nope.mp4'))).rejects.toThrow();
+  });
+
+  it('falls back to ffprobe when an .mp4 is not parseable ISOBMFF', async () => {
+    // A bogus .mp4 (no moov) → InvalidFormatError from the parser → ffprobe path,
+    // which then fails on the junk file (proving the fallback was taken).
+    const bogus = join(dir, 'bogus.mp4');
+    writeFileSync(bogus, Buffer.from('not a real mp4 file'));
+    await expect(resolveKeyframes(bogus)).rejects.toBeInstanceOf(FFmpegError);
+  });
+
+  it('probeKeyframes throws when the stream exposes no video keyframe', async () => {
+    await expect(probeKeyframes(audioOnly)).rejects.toThrow(/no video keyframes/);
   });
 });
 
