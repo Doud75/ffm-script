@@ -27,9 +27,7 @@ describe('SKILL.md', () => {
     );
     expect(exported.length).toBeGreaterThan(0);
 
-    const missing = exported.filter(
-      (name) => !new RegExp(`\\b${name}\\b`).test(skill),
-    );
+    const missing = exported.filter((name) => !new RegExp(`\\b${name}\\b`).test(skill));
     expect(missing).toEqual([]);
   });
 });

@@ -70,8 +70,8 @@ describe('trim', () => {
   });
 
   it('throws InvalidFormatError when the output is not an .mp4', async () => {
-    await expect(
-      trim(input, join(dir, 'out.mkv'), { start: 0, end: 1 }),
-    ).rejects.toBeInstanceOf(InvalidFormatError);
+    await expect(trim(input, join(dir, 'out.mkv'), { start: 0, end: 1 })).rejects.toBeInstanceOf(
+      InvalidFormatError,
+    );
   });
 });

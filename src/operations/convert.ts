@@ -53,8 +53,7 @@ export async function convert(
     );
   }
 
-  const duration =
-    options.onProgress !== undefined ? (await probe(input)).duration : undefined;
+  const duration = options.onProgress !== undefined ? (await probe(input)).duration : undefined;
 
   await spawnFFmpeg({
     binary: resolveBinary('ffmpeg'),

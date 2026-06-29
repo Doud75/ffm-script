@@ -10,9 +10,9 @@ import { SAMPLE } from './helpers.js';
 
 describe('buildOverlayFilter', () => {
   it('overlays the watermark directly when opaque and unscaled', () => {
-    expect(buildOverlayFilter({ position: 'bottom-right', margin: 10, opacity: 1, width: undefined })).toBe(
-      '[0:v][1:v]overlay=W-w-10:H-h-10[out]',
-    );
+    expect(
+      buildOverlayFilter({ position: 'bottom-right', margin: 10, opacity: 1, width: undefined }),
+    ).toBe('[0:v][1:v]overlay=W-w-10:H-h-10[out]');
   });
 
   it('maps each anchor to the right x:y expression', () => {
@@ -26,9 +26,9 @@ describe('buildOverlayFilter', () => {
   });
 
   it('fades the watermark via an rgba colorchannelmixer when opacity < 1', () => {
-    expect(buildOverlayFilter({ position: 'center', margin: 0, opacity: 0.5, width: undefined })).toBe(
-      '[1:v]format=rgba,colorchannelmixer=aa=0.5[wm];[0:v][wm]overlay=(W-w)/2:(H-h)/2[out]',
-    );
+    expect(
+      buildOverlayFilter({ position: 'center', margin: 0, opacity: 0.5, width: undefined }),
+    ).toBe('[1:v]format=rgba,colorchannelmixer=aa=0.5[wm];[0:v][wm]overlay=(W-w)/2:(H-h)/2[out]');
   });
 
   it('scales the watermark to the requested width', () => {
@@ -53,9 +53,16 @@ describe('overlay', () => {
     watermark = join(dir, 'wm.png');
     // A 100x50 solid PNG is enough to exercise the overlay path.
     execFileSync('ffmpeg', [
-      '-y', '-loglevel', 'error',
-      '-f', 'lavfi', '-i', 'color=red:size=100x50',
-      '-frames:v', '1', watermark,
+      '-y',
+      '-loglevel',
+      'error',
+      '-f',
+      'lavfi',
+      '-i',
+      'color=red:size=100x50',
+      '-frames:v',
+      '1',
+      watermark,
     ]);
   });
 
@@ -87,7 +94,17 @@ describe('overlay', () => {
 
   it('handles a video with no audio track', async () => {
     const silent = join(dir, 'silent.mp4');
-    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-an', '-c:v', 'libx264', silent]);
+    execFileSync('ffmpeg', [
+      '-y',
+      '-loglevel',
+      'error',
+      '-i',
+      SAMPLE,
+      '-an',
+      '-c:v',
+      'libx264',
+      silent,
+    ]);
 
     const output = join(dir, 'out-silent.mp4');
     await overlay(silent, output, { watermark });
@@ -98,9 +115,9 @@ describe('overlay', () => {
   }, 60_000);
 
   it('throws InvalidOptionsError for an out-of-range opacity', async () => {
-    await expect(overlay(SAMPLE, join(dir, 'x.mp4'), { watermark, opacity: 2 })).rejects.toBeInstanceOf(
-      InvalidOptionsError,
-    );
+    await expect(
+      overlay(SAMPLE, join(dir, 'x.mp4'), { watermark, opacity: 2 }),
+    ).rejects.toBeInstanceOf(InvalidOptionsError);
   });
 
   it('throws InvalidFormatError when the watermark is not an image', async () => {

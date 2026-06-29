@@ -60,7 +60,9 @@ describe('toHLS', () => {
 
   it('throws FileNotFoundError when the input is missing', async () => {
     await expect(
-      toHLS(join(dir, 'nope.mp4'), join(dir, 'x'), { resolutions: [{ width: 320, bitrate: '400k' }] }),
+      toHLS(join(dir, 'nope.mp4'), join(dir, 'x'), {
+        resolutions: [{ width: 320, bitrate: '400k' }],
+      }),
     ).rejects.toBeInstanceOf(FileNotFoundError);
   });
 });

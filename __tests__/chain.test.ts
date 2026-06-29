@@ -60,20 +60,14 @@ describe('ffmscript (chainable API)', () => {
     const output = join(dir, 'raw-override.mp4');
     // .convert({ width: 640 }) would scale to 640, but the raw -vf is appended
     // after it, and FFmpeg's last -vf wins → 320.
-    await ffmscript(SAMPLE)
-      .convert({ width: 640 })
-      .raw(['-vf', 'scale=320:-2'])
-      .save(output);
+    await ffmscript(SAMPLE).convert({ width: 640 }).raw(['-vf', 'scale=320:-2']).save(output);
 
     expect((await probe(output)).video?.width).toBe(320);
   }, 30_000);
 
   it('fuses trim + raw into a single re-encoding pass', async () => {
     const output = join(dir, 'trim-raw.mp4');
-    await ffmscript(SAMPLE)
-      .trim({ start: 1, end: 5 })
-      .raw(['-vf', 'scale=320:-2'])
-      .save(output);
+    await ffmscript(SAMPLE).trim({ start: 1, end: 5 }).raw(['-vf', 'scale=320:-2']).save(output);
 
     const info = await probe(output);
     expect(info.duration).toBeCloseTo(4, 0);

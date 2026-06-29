@@ -189,12 +189,7 @@ export interface ParallelConvertOptions {
 }
 
 /** Where a watermark is anchored within the frame. */
-export type OverlayPosition =
-  | 'top-left'
-  | 'top-right'
-  | 'bottom-left'
-  | 'bottom-right'
-  | 'center';
+export type OverlayPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
 
 /** Options for {@link overlay}. */
 export interface OverlayOptions {

@@ -84,13 +84,15 @@ describe('toAnimation', () => {
   }, 60_000);
 
   it('throws InvalidFormatError for an unsupported output extension', async () => {
-    await expect(toAnimation(SAMPLE, join(dir, 'x.mp4'))).rejects.toBeInstanceOf(InvalidFormatError);
+    await expect(toAnimation(SAMPLE, join(dir, 'x.mp4'))).rejects.toBeInstanceOf(
+      InvalidFormatError,
+    );
   });
 
   it('throws InvalidOptionsError when end is not after start', async () => {
-    await expect(toAnimation(SAMPLE, join(dir, 'x.gif'), { start: 5, end: 5 })).rejects.toBeInstanceOf(
-      InvalidOptionsError,
-    );
+    await expect(
+      toAnimation(SAMPLE, join(dir, 'x.gif'), { start: 5, end: 5 }),
+    ).rejects.toBeInstanceOf(InvalidOptionsError);
   });
 
   it('throws InvalidOptionsError for a non-positive fps', async () => {

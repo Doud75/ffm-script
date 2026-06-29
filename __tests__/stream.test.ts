@@ -42,8 +42,18 @@ describe('runStream', () => {
     // Copying AAC out of MPEG-TS into MP4 needs the aac_adtstoasc bitstream
     // filter — the caller owns the args, so they supply it.
     await runStream(
-      ['-i', 'pipe:0', '-c', 'copy', '-bsf:a', 'aac_adtstoasc',
-       '-movflags', 'frag_keyframe+empty_moov', '-y', output],
+      [
+        '-i',
+        'pipe:0',
+        '-c',
+        'copy',
+        '-bsf:a',
+        'aac_adtstoasc',
+        '-movflags',
+        'frag_keyframe+empty_moov',
+        '-y',
+        output,
+      ],
       { input: createReadStream(tsSource) },
     );
 

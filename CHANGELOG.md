@@ -4,6 +4,17 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-06-29
+
+### Added
+
+- **Linting & formatting toolchain.** ESLint (flat config) with **type-aware** `typescript-eslint` rules (`recommendedTypeChecked` + `stylisticTypeChecked`) over `src/`, plus Prettier for formatting — neither existed before. New scripts: `pnpm lint`, `pnpm lint:fix`, `pnpm format`, `pnpm format:check`. Configs: `eslint.config.js`, `.prettierrc`, `.prettierignore`.
+- **Test coverage reporting.** `pnpm test:coverage` runs Jest with coverage; `coverageThreshold` enforces a minimum (statements 88 / branches 80 / functions 93 / lines 90) so CI fails on regressions. An `lcov` report is emitted for Codecov, with a coverage badge in the README.
+
+### Changed
+
+- **CI** gained a `lint` job (`pnpm lint` + `pnpm format:check`); the `test` job now runs with coverage and uploads the report to Codecov (via OIDC, no token). The whole codebase was reformatted once with Prettier — no behavioural changes.
+
 ## [0.10.1] - 2026-06-23
 
 ### Changed

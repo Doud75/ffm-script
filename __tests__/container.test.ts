@@ -1,8 +1,4 @@
-import {
-  resolveOutputContainer,
-  assertCodecAllowed,
-  isCrfFamily,
-} from '../src/core/container.js';
+import { resolveOutputContainer, assertCodecAllowed, isCrfFamily } from '../src/core/container.js';
 import { InvalidFormatError } from '../src/errors/index.js';
 
 describe('resolveOutputContainer', () => {
@@ -40,7 +36,9 @@ describe('assertCodecAllowed', () => {
   });
 
   it('rejects a known codec the container cannot carry', () => {
-    expect(() => assertCodecAllowed(webm, 'libx264', 'video', 'o.webm')).toThrow(InvalidFormatError);
+    expect(() => assertCodecAllowed(webm, 'libx264', 'video', 'o.webm')).toThrow(
+      InvalidFormatError,
+    );
     expect(() => assertCodecAllowed(webm, 'aac', 'audio', 'o.webm')).toThrow(InvalidFormatError);
   });
 

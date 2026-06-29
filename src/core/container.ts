@@ -35,7 +35,13 @@ const CONTAINERS: Record<VideoContainer, ContainerConfig> = {
   mp4: { extensions: ['.mp4'], ...H264_CONTAINER },
   mov: { extensions: ['.mov'], ...H264_CONTAINER },
   // Matroska is a near-universal container: accept whatever codec the caller picks.
-  mkv: { extensions: ['.mkv'], defaultVideoCodec: 'libx264', defaultAudioCodec: 'aac', videoCodecs: 'any', audioCodecs: 'any' },
+  mkv: {
+    extensions: ['.mkv'],
+    defaultVideoCodec: 'libx264',
+    defaultAudioCodec: 'aac',
+    videoCodecs: 'any',
+    audioCodecs: 'any',
+  },
   webm: {
     extensions: ['.webm'],
     defaultVideoCodec: 'libvpx-vp9',
@@ -56,17 +62,27 @@ const CONTAINERS: Record<VideoContainer, ContainerConfig> = {
  */
 const ENCODER_TO_CODEC: Record<string, string> = {
   // video
-  libx264: 'h264', h264: 'h264',
-  libx265: 'h265', hevc: 'h265', h265: 'h265',
-  'libvpx-vp9': 'vp9', vp9: 'vp9',
-  libvpx: 'vp8', vp8: 'vp8',
-  'libaom-av1': 'av1', libsvtav1: 'av1', av1: 'av1',
+  libx264: 'h264',
+  h264: 'h264',
+  libx265: 'h265',
+  hevc: 'h265',
+  h265: 'h265',
+  'libvpx-vp9': 'vp9',
+  vp9: 'vp9',
+  libvpx: 'vp8',
+  vp8: 'vp8',
+  'libaom-av1': 'av1',
+  libsvtav1: 'av1',
+  av1: 'av1',
   mpeg4: 'mpeg4',
   // audio
   aac: 'aac',
-  libopus: 'opus', opus: 'opus',
-  libvorbis: 'vorbis', vorbis: 'vorbis',
-  libmp3lame: 'mp3', mp3: 'mp3',
+  libopus: 'opus',
+  opus: 'opus',
+  libvorbis: 'vorbis',
+  vorbis: 'vorbis',
+  libmp3lame: 'mp3',
+  mp3: 'mp3',
   ac3: 'ac3',
 };
 

@@ -58,20 +58,27 @@ export async function overlay(
     width: options.width,
   });
 
-  const duration =
-    options.onProgress !== undefined ? (await probe(input)).duration : undefined;
+  const duration = options.onProgress !== undefined ? (await probe(input)).duration : undefined;
 
   // `-map 0:a?` copies the original audio when present (the `?` makes it optional,
   // so a silent video doesn't fail); only the video is re-encoded.
   const args = [
-    '-i', input,
-    '-i', options.watermark,
-    '-filter_complex', filter,
-    '-map', '[out]',
-    '-map', '0:a?',
-    '-c:v', 'libx264',
-    '-c:a', 'copy',
-    '-y', output,
+    '-i',
+    input,
+    '-i',
+    options.watermark,
+    '-filter_complex',
+    filter,
+    '-map',
+    '[out]',
+    '-map',
+    '0:a?',
+    '-c:v',
+    'libx264',
+    '-c:a',
+    'copy',
+    '-y',
+    output,
   ];
 
   await spawnFFmpeg({

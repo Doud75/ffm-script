@@ -3,12 +3,7 @@ import { spawnFFmpeg } from '../core/spawn.js';
 import { validateInput } from '../core/validate.js';
 import { ALL_INPUT_FORMATS } from '../core/formats.js';
 import { InvalidFormatError } from '../errors/index.js';
-import type {
-  AudioStream,
-  ProbeResult,
-  Stream,
-  VideoStream,
-} from '../types/index.js';
+import type { AudioStream, ProbeResult, Stream, VideoStream } from '../types/index.js';
 
 /** Shape of the relevant subset of `ffprobe -print_format json` output. */
 interface FfprobeOutput {
@@ -58,15 +53,7 @@ export async function probe(file: string): Promise<ProbeResult> {
 
   const stdout = await spawnFFmpeg({
     binary: resolveBinary('ffprobe'),
-    args: [
-      '-v',
-      'quiet',
-      '-print_format',
-      'json',
-      '-show_streams',
-      '-show_format',
-      file,
-    ],
+    args: ['-v', 'quiet', '-print_format', 'json', '-show_streams', '-show_format', file],
   });
 
   return parseProbeOutput(file, stdout);
@@ -174,8 +161,7 @@ function toFps(rate: string | undefined): number {
 function toRotation(stream: FfprobeStream): number {
   const sideData = stream.side_data_list?.find((d) => d.rotation !== undefined);
   const raw =
-    sideData?.rotation ??
-    (stream.tags?.rotate !== undefined ? toNumber(stream.tags.rotate) : 0);
+    sideData?.rotation ?? (stream.tags?.rotate !== undefined ? toNumber(stream.tags.rotate) : 0);
   return ((Math.round(raw) % 360) + 360) % 360;
 }
 

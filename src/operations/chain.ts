@@ -126,7 +126,8 @@ export class FfmScriptChain {
 
     // Progress needs a total duration: the trim length, else the input's.
     const duration =
-      trimDuration ?? (options.onProgress !== undefined ? (await probe(this.#input)).duration : undefined);
+      trimDuration ??
+      (options.onProgress !== undefined ? (await probe(this.#input)).duration : undefined);
 
     await spawnFFmpeg({
       binary: resolveBinary('ffmpeg'),

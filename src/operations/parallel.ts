@@ -49,7 +49,11 @@ const MIN_CHUNK_SECONDS = 5;
  * the remaining shorter chunks instead of waiting. Bounded so chunks stay at least
  * {@link MIN_CHUNK_SECONDS} long, and never more than the available keyframes.
  */
-export function planSegmentCount(workers: number, totalDuration: number, keyframeCount: number): number {
+export function planSegmentCount(
+  workers: number,
+  totalDuration: number,
+  keyframeCount: number,
+): number {
   const maxByMinChunk = Math.max(workers, Math.floor(totalDuration / MIN_CHUNK_SECONDS));
   return Math.min(workers * SEGMENTS_PER_WORKER, maxByMinChunk, keyframeCount);
 }
@@ -125,7 +129,11 @@ export async function parallelConvert(
 
     await Promise.all([
       transcodeSegments(input, segments, workDir, totalDuration, workers, options).then((chunks) =>
-        concatDemuxer(chunks, videoTarget, options.signal !== undefined ? { signal: options.signal } : {}),
+        concatDemuxer(
+          chunks,
+          videoTarget,
+          options.signal !== undefined ? { signal: options.signal } : {},
+        ),
       ),
       audioTrack !== undefined ? encodeAudio(input, audioTrack, options.signal) : Promise.resolve(),
     ]);
@@ -167,7 +175,8 @@ async function transcodeSegments(
     const chunk = join(workDir, `chunk_${String(seg.index).padStart(4, '0')}.mp4`);
     chunks[seg.index] = chunk;
 
-    const chunkDuration = seg.endTime !== undefined ? seg.endTime - seg.startTime : totalDuration - seg.startTime;
+    const chunkDuration =
+      seg.endTime !== undefined ? seg.endTime - seg.startTime : totalDuration - seg.startTime;
     // Video-only chunk (-an): audio is handled separately, in one pass.
     const args = ['-ss', String(seg.startTime), '-i', input];
     if (seg.endTime !== undefined) args.push('-t', String(chunkDuration));

@@ -73,8 +73,8 @@ describe('extractAudio', () => {
   });
 
   it('throws FileNotFoundError when the input is missing', async () => {
-    await expect(
-      extractAudio(join(dir, 'nope.mp4'), join(dir, 'out.mp3')),
-    ).rejects.toBeInstanceOf(FileNotFoundError);
+    await expect(extractAudio(join(dir, 'nope.mp4'), join(dir, 'out.mp3'))).rejects.toBeInstanceOf(
+      FileNotFoundError,
+    );
   });
 });

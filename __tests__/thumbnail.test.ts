@@ -55,9 +55,9 @@ describe('thumbnail', () => {
   }, 30_000);
 
   it('throws InvalidFormatError for an unsupported output extension', async () => {
-    await expect(
-      thumbnail(input, join(dir, 'frame.gif'), { timestamp: 1 }),
-    ).rejects.toBeInstanceOf(InvalidFormatError);
+    await expect(thumbnail(input, join(dir, 'frame.gif'), { timestamp: 1 })).rejects.toBeInstanceOf(
+      InvalidFormatError,
+    );
   });
 
   it('throws InvalidOptionsError for a bad timestamp', async () => {
