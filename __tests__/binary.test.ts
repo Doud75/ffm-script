@@ -1,7 +1,7 @@
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { clearBinaryCache, resolveBinary } from '../src/core/binary.js';
+import { checkDependencies, clearBinaryCache, resolveBinary } from '../src/core/binary.js';
 import { FFmpegNotFoundError } from '../src/errors/index.js';
 
 const ENV_KEYS = ['PATH', 'FFMPEG_PATH', 'FFPROBE_PATH'] as const;
@@ -72,5 +72,15 @@ describe('resolveBinary', () => {
     process.env['PATH'] = ''; // would fail to resolve if not cached
 
     expect(resolveBinary('ffmpeg')).toBe(first);
+  });
+
+  it('checkDependencies resolves both ffmpeg and ffprobe', () => {
+    delete process.env['FFMPEG_PATH'];
+    delete process.env['FFPROBE_PATH'];
+    createExecutable('ffmpeg');
+    createExecutable('ffprobe');
+    process.env['PATH'] = tmp;
+
+    expect(() => checkDependencies()).not.toThrow();
   });
 });

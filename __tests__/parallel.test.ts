@@ -239,6 +239,24 @@ describe('parallelConvert', () => {
     expect(info.duration).toBeCloseTo(10, 0); // full length preserved across joins
   }, 60_000);
 
+  it('threads an abort signal through the whole pipeline (transcode, concat, audio, mux)', async () => {
+    const output = join(dir, 'out-signal.mp4');
+    const controller = new AbortController();
+
+    // A fresh, never-aborted signal exercises every `signal` spread along the
+    // pipeline on a real run that still completes successfully.
+    await parallelConvert(SAMPLE, output, {
+      workers: 4,
+      targetBitrate: '800k',
+      signal: controller.signal,
+    });
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.audio?.codec).toBe('aac');
+    expect(info.duration).toBeCloseTo(10, 0);
+  }, 60_000);
+
   it('throws InvalidOptionsError for a non-positive worker count', async () => {
     await expect(
       parallelConvert(SAMPLE, join(dir, 'x.mp4'), { workers: 0 }),

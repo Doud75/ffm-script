@@ -136,6 +136,51 @@ describe('parseProbeOutput', () => {
     expect(result.tags.track).toBe('3');
   });
 
+  it('defaults to no streams when the streams key is absent', () => {
+    const result = parseProbeOutput(FILE, JSON.stringify({ format: { duration: '5' } }));
+
+    expect(result.streams).toEqual([]);
+    expect(result.video).toBeNull();
+    expect(result.audio).toBeNull();
+  });
+
+  it('defaults a missing codec name to an empty string', () => {
+    const result = parseProbeOutput(FILE, payload([{ codec_type: 'audio', channels: 2 }]));
+
+    expect(result.audio?.codec).toBe('');
+  });
+
+  it('drops null tag values', () => {
+    const result = parseProbeOutput(
+      FILE,
+      payload([], { tags: { title: 'ok', bad: null } as unknown as Record<string, string> }),
+    );
+
+    expect(result.tags.title).toBe('ok');
+    expect(result.tags.bad).toBeUndefined();
+  });
+
+  it('treats a denominator-less frame rate as /1', () => {
+    const result = parseProbeOutput(FILE, payload([{ codec_type: 'video', avg_frame_rate: '24' }]));
+
+    expect(result.video?.fps).toBe(24);
+  });
+
+  it('returns 0 fps for a zero denominator (avoids division by zero)', () => {
+    const result = parseProbeOutput(
+      FILE,
+      payload([{ codec_type: 'video', avg_frame_rate: '30/0' }]),
+    );
+
+    expect(result.video?.fps).toBe(0);
+  });
+
+  it('coerces a non-numeric duration to 0', () => {
+    const result = parseProbeOutput(FILE, payload([], { duration: 'not-a-number' }));
+
+    expect(result.duration).toBe(0);
+  });
+
   it('throws InvalidFormatError on unparseable output', () => {
     expect(() => parseProbeOutput(FILE, 'not json')).toThrow(InvalidFormatError);
   });

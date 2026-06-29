@@ -41,4 +41,19 @@ describe('typed errors', () => {
     expect(new FFmpegNotFoundError('ffprobe').message).toMatch(/FFPROBE_PATH/);
     expect(new FFmpegNotFoundError('ffmpeg').message).toMatch(/ffmpeg\.org\/download/);
   });
+
+  it('FFmpegNotFoundError defaults to ffmpeg and reports a PATH miss', () => {
+    const err = new FFmpegNotFoundError();
+    expect(err.message).toMatch(/"ffmpeg" was not found in your PATH/);
+    expect(err.message).toMatch(/FFMPEG_PATH/);
+  });
+
+  it('FFmpegNotFoundError reports an invalid env path when provided', () => {
+    expect(new FFmpegNotFoundError('ffmpeg', '/bad/ffmpeg').message).toMatch(
+      /FFMPEG_PATH is set to "\/bad\/ffmpeg", but no executable was found there\./,
+    );
+    expect(new FFmpegNotFoundError('ffprobe', '/bad/ffprobe').message).toMatch(
+      /FFPROBE_PATH is set to "\/bad\/ffprobe"/,
+    );
+  });
 });
