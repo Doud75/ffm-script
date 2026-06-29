@@ -64,11 +64,15 @@ export async function setMetadata(
   // `-map 0` keeps every stream (extra audio tracks, subtitles…) which the
   // default stream selection would otherwise drop on a copy.
   const args = [
-    '-i', input,
-    '-map', '0',
-    '-c', 'copy',
+    '-i',
+    input,
+    '-map',
+    '0',
+    '-c',
+    'copy',
     ...buildMetadataArgs({ tags, clear }),
-    '-y', output,
+    '-y',
+    output,
   ];
 
   await spawnFFmpeg({

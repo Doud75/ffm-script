@@ -25,11 +25,7 @@ import type { TrimOptions } from '../types/index.js';
  * @throws {FFmpegNotFoundError} when `ffmpeg` cannot be located.
  * @throws {FFmpegError} when `ffmpeg` exits with a non-zero code.
  */
-export async function trim(
-  input: string,
-  output: string,
-  options: TrimOptions,
-): Promise<void> {
+export async function trim(input: string, output: string, options: TrimOptions): Promise<void> {
   await validateInput(input, VIDEO_INPUT_FORMATS);
   if (extname(output).toLowerCase() !== '.mp4') {
     throw new InvalidFormatError(output, 'output must be an .mp4 file');
@@ -47,18 +43,20 @@ export async function trim(
 
   // 'fast' copies streams (keyframe-bound); 'precise' re-encodes for accuracy.
   const codecArgs =
-    (options.mode ?? 'fast') === 'fast'
-      ? ['-c', 'copy']
-      : ['-c:v', 'libx264', '-c:a', 'aac'];
+    (options.mode ?? 'fast') === 'fast' ? ['-c', 'copy'] : ['-c:v', 'libx264', '-c:a', 'aac'];
 
   // `-ss` before `-i` seeks the input fast; `-t` bounds the output length.
   // `-to` is avoided: with input seeking it is measured from the seek point.
   const args = [
-    '-ss', String(start),
-    '-i', input,
-    '-t', String(duration),
+    '-ss',
+    String(start),
+    '-i',
+    input,
+    '-t',
+    String(duration),
     ...codecArgs,
-    '-y', output,
+    '-y',
+    output,
   ];
 
   await spawnFFmpeg({

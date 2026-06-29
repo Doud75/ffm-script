@@ -117,9 +117,7 @@ async function concatFilter(
   for (const input of inputs) args.push('-i', input);
 
   // [0:v:0][0:a:0][1:v:0][1:a:0]...concat=n=N:v=1:a=1[outv][outa]
-  const labels = inputs
-    .map((_, i) => (hasAudio ? `[${i}:v:0][${i}:a:0]` : `[${i}:v:0]`))
-    .join('');
+  const labels = inputs.map((_, i) => (hasAudio ? `[${i}:v:0][${i}:a:0]` : `[${i}:v:0]`)).join('');
   const filter =
     `${labels}concat=n=${inputs.length}:v=1:a=${hasAudio ? 1 : 0}[outv]` +
     (hasAudio ? '[outa]' : '');

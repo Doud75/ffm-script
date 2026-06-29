@@ -91,9 +91,9 @@ describe('convert', () => {
   });
 
   it('throws InvalidOptionsError when a quality preset is used with a non-CRF codec', async () => {
-    await expect(
-      convert(input, join(dir, 'q.webm'), { quality: 'high' }),
-    ).rejects.toBeInstanceOf(InvalidOptionsError);
+    await expect(convert(input, join(dir, 'q.webm'), { quality: 'high' })).rejects.toBeInstanceOf(
+      InvalidOptionsError,
+    );
   });
 
   it('rejects with an AbortError when the signal is aborted', async () => {

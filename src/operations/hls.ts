@@ -27,11 +27,7 @@ const AUDIO_BITRATE = '128k';
  * @throws {FFmpegNotFoundError} when `ffmpeg` cannot be located.
  * @throws {FFmpegError} when `ffmpeg` exits with a non-zero code.
  */
-export async function toHLS(
-  input: string,
-  outputDir: string,
-  options: HLSOptions,
-): Promise<void> {
+export async function toHLS(input: string, outputDir: string, options: HLSOptions): Promise<void> {
   await validateInput(input, VIDEO_INPUT_FORMATS);
 
   const { resolutions } = options;
@@ -92,13 +88,20 @@ function buildArgs(
     .join(' ');
 
   args.push(
-    '-f', 'hls',
-    '-hls_time', String(segmentDuration),
-    '-hls_playlist_type', 'vod',
-    '-hls_flags', 'independent_segments',
-    '-hls_segment_filename', join(outputDir, '%v', 'segment_%03d.ts'),
-    '-master_pl_name', 'master.m3u8',
-    '-var_stream_map', varStreamMap,
+    '-f',
+    'hls',
+    '-hls_time',
+    String(segmentDuration),
+    '-hls_playlist_type',
+    'vod',
+    '-hls_flags',
+    'independent_segments',
+    '-hls_segment_filename',
+    join(outputDir, '%v', 'segment_%03d.ts'),
+    '-master_pl_name',
+    'master.m3u8',
+    '-var_stream_map',
+    varStreamMap,
     '-y',
     join(outputDir, '%v', 'playlist.m3u8'),
   );

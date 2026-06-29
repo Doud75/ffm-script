@@ -71,7 +71,9 @@ describe('quality presets (integration)', () => {
 
   it('the chainable API rejects quality combined with a video bitrate', async () => {
     await expect(
-      ffmscript(SAMPLE).convert({ quality: 'high', videoBitrate: '2000k' }).save(join(dir, 'x.mp4')),
+      ffmscript(SAMPLE)
+        .convert({ quality: 'high', videoBitrate: '2000k' })
+        .save(join(dir, 'x.mp4')),
     ).rejects.toBeInstanceOf(InvalidOptionsError);
   });
 

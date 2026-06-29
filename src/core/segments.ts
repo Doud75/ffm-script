@@ -17,10 +17,7 @@ export interface Segment {
  *
  * Produces at most `segmentCount` segments (capped by the keyframe count).
  */
-export function planSegments(
-  keyframes: Keyframe[],
-  options: { segmentCount: number },
-): Segment[] {
+export function planSegments(keyframes: Keyframe[], options: { segmentCount: number }): Segment[] {
   if (keyframes.length === 0) return [];
 
   const requested = Math.max(1, Math.floor(options.segmentCount));
@@ -29,7 +26,9 @@ export function planSegments(
   // Pick evenly-spaced keyframe indices as segment starts (deduped).
   const startIndices = [
     ...new Set(
-      Array.from({ length: segmentCount }, (_, i) => Math.floor((i * keyframes.length) / segmentCount)),
+      Array.from({ length: segmentCount }, (_, i) =>
+        Math.floor((i * keyframes.length) / segmentCount),
+      ),
     ),
   ];
 

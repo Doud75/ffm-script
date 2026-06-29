@@ -65,7 +65,7 @@ describe('resolveBinary', () => {
 
   it('memoizes the resolved path across calls', () => {
     delete process.env['FFMPEG_PATH'];
-    const bin = createExecutable('ffmpeg');
+    createExecutable('ffmpeg');
     process.env['PATH'] = tmp;
 
     const first = resolveBinary('ffmpeg');

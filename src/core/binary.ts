@@ -34,11 +34,9 @@ function isExecutable(path: string): boolean {
  * On Windows each entry is expanded with the extensions listed in PATHEXT.
  */
 function* candidatesInPath(name: string): Generator<string> {
-  const extensions = isWindows
-    ? (process.env['PATHEXT'] ?? DEFAULT_PATHEXT).split(';')
-    : [''];
+  const extensions = isWindows ? (process.env.PATHEXT ?? DEFAULT_PATHEXT).split(';') : [''];
 
-  for (const dir of (process.env['PATH'] ?? '').split(delimiter)) {
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
     if (dir === '') continue;
     for (const ext of extensions) {
       yield join(dir, name + ext);

@@ -20,12 +20,32 @@ describe('concat', () => {
 
     mpeg4Variant = join(dir, 'variant.mp4');
     execFileSync('ffmpeg', [
-      '-y', '-loglevel', 'error', '-i', SAMPLE,
-      '-c:v', 'mpeg4', '-q:v', '5', '-c:a', 'copy', mpeg4Variant,
+      '-y',
+      '-loglevel',
+      'error',
+      '-i',
+      SAMPLE,
+      '-c:v',
+      'mpeg4',
+      '-q:v',
+      '5',
+      '-c:a',
+      'copy',
+      mpeg4Variant,
     ]);
 
     silent = join(dir, 'silent.mp4');
-    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-an', '-c:v', 'libx264', silent]);
+    execFileSync('ffmpeg', [
+      '-y',
+      '-loglevel',
+      'error',
+      '-i',
+      SAMPLE,
+      '-an',
+      '-c:v',
+      'libx264',
+      silent,
+    ]);
   }, 60_000);
 
   afterAll(() => {
@@ -101,7 +121,9 @@ describe('concat', () => {
   }, 30_000);
 
   it('throws InvalidOptionsError for fewer than two inputs', async () => {
-    await expect(concat([SAMPLE], join(dir, 'one.mp4'))).rejects.toBeInstanceOf(InvalidOptionsError);
+    await expect(concat([SAMPLE], join(dir, 'one.mp4'))).rejects.toBeInstanceOf(
+      InvalidOptionsError,
+    );
   });
 
   it('throws InvalidFormatError when the output is not an .mp4', async () => {

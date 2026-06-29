@@ -42,7 +42,18 @@ describe('extractKeyframeIndex', () => {
       dir = mkdtempSync(join(tmpdir(), 'ffm-allintra-'));
       allIntra = join(dir, 'allintra.mp4');
       // -g 1 makes every frame a keyframe; the muxer then omits the stss box.
-      execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-g', '1', '-c:a', 'aac', allIntra]);
+      execFileSync('ffmpeg', [
+        '-y',
+        '-loglevel',
+        'error',
+        '-i',
+        SAMPLE,
+        '-g',
+        '1',
+        '-c:a',
+        'aac',
+        allIntra,
+      ]);
     });
 
     afterAll(() => {
@@ -82,9 +93,24 @@ describe('resolveKeyframes (multi-container)', () => {
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-c', 'copy', mov]);
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-c', 'copy', mkv]);
     execFileSync('ffmpeg', [
-      '-y', '-loglevel', 'error', '-i', SAMPLE,
-      '-c:v', 'libvpx', '-b:v', '500k', '-deadline', 'realtime', '-cpu-used', '8', '-g', '30',
-      '-c:a', 'libvorbis', webm,
+      '-y',
+      '-loglevel',
+      'error',
+      '-i',
+      SAMPLE,
+      '-c:v',
+      'libvpx',
+      '-b:v',
+      '500k',
+      '-deadline',
+      'realtime',
+      '-cpu-used',
+      '8',
+      '-g',
+      '30',
+      '-c:a',
+      'libvorbis',
+      webm,
     ]);
   }, 60_000);
 

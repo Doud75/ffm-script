@@ -152,7 +152,18 @@ describe('parallelConvert', () => {
   it('falls back to frame-boundary cuts for an all-intra input (no stss box)', async () => {
     const allIntra = join(dir, 'allintra.mp4');
     // -g 1 makes every frame a keyframe; the muxer omits the stss box.
-    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-g', '1', '-c:a', 'aac', allIntra]);
+    execFileSync('ffmpeg', [
+      '-y',
+      '-loglevel',
+      'error',
+      '-i',
+      SAMPLE,
+      '-g',
+      '1',
+      '-c:a',
+      'aac',
+      allIntra,
+    ]);
 
     const output = join(dir, 'out-allintra.mp4');
     await parallelConvert(allIntra, output, { workers: 4, targetBitrate: '800k' });
@@ -170,9 +181,12 @@ describe('parallelConvert', () => {
     const streams = (
       JSON.parse(
         execFileSync('ffprobe', [
-          '-v', 'error',
-          '-show_entries', 'stream=codec_type,start_time,duration',
-          '-of', 'json',
+          '-v',
+          'error',
+          '-show_entries',
+          'stream=codec_type,start_time,duration',
+          '-of',
+          'json',
           output,
         ]).toString(),
       ) as { streams: { codec_type: string; start_time: string; duration: string }[] }
@@ -192,7 +206,17 @@ describe('parallelConvert', () => {
 
   it('handles an input with no audio track', async () => {
     const silent = join(dir, 'silent.mp4');
-    execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-an', '-c:v', 'libx264', silent]);
+    execFileSync('ffmpeg', [
+      '-y',
+      '-loglevel',
+      'error',
+      '-i',
+      SAMPLE,
+      '-an',
+      '-c:v',
+      'libx264',
+      silent,
+    ]);
 
     const output = join(dir, 'out-silent.mp4');
     await parallelConvert(silent, output, { workers: 4, targetBitrate: '800k' });
@@ -216,9 +240,9 @@ describe('parallelConvert', () => {
   }, 60_000);
 
   it('throws InvalidOptionsError for a non-positive worker count', async () => {
-    await expect(parallelConvert(SAMPLE, join(dir, 'x.mp4'), { workers: 0 })).rejects.toBeInstanceOf(
-      InvalidOptionsError,
-    );
+    await expect(
+      parallelConvert(SAMPLE, join(dir, 'x.mp4'), { workers: 0 }),
+    ).rejects.toBeInstanceOf(InvalidOptionsError);
   });
 
   it('writes an MKV output by stream-copying the h264/aac joins', async () => {

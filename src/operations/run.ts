@@ -70,10 +70,7 @@ export async function run(args: string[], options: RunOptions = {}): Promise<str
  *   { input: req, output: res, onProgress: (p) => console.log(`${p.percent}%`) },
  * );
  */
-export async function runStream(
-  args: string[],
-  options: RunStreamOptions = {},
-): Promise<void> {
+export async function runStream(args: string[], options: RunStreamOptions = {}): Promise<void> {
   if (args.length === 0) {
     throw new InvalidOptionsError('runStream requires at least one argument');
   }

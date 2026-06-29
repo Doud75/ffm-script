@@ -39,7 +39,10 @@ export async function toAnimation(
 
   const ext = extname(output).toLowerCase();
   if (ext !== '.gif' && ext !== '.webp') {
-    throw new InvalidFormatError(output, `unsupported animation extension "${ext || '(none)'}" (expected .gif, .webp)`);
+    throw new InvalidFormatError(
+      output,
+      `unsupported animation extension "${ext || '(none)'}" (expected .gif, .webp)`,
+    );
   }
 
   const fps = options.fps ?? DEFAULT_FPS;

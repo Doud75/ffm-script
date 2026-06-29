@@ -14,10 +14,7 @@ import { FileNotFoundError, InvalidFormatError } from '../errors/index.js';
  * @throws {FileNotFoundError} when the file does not exist.
  * @throws {InvalidFormatError} when the extension is not in `allowedExtensions`.
  */
-export async function validateInput(
-  path: string,
-  allowedExtensions?: string[],
-): Promise<void> {
+export async function validateInput(path: string, allowedExtensions?: string[]): Promise<void> {
   try {
     await access(path);
   } catch {

@@ -11,15 +11,19 @@ import { SAMPLE } from './helpers.js';
 describe('buildMetadataArgs', () => {
   it('emits one -metadata key=value per tag', () => {
     expect(buildMetadataArgs({ tags: { title: 'My Movie', artist: 'Me' }, clear: false })).toEqual([
-      '-metadata', 'title=My Movie',
-      '-metadata', 'artist=Me',
+      '-metadata',
+      'title=My Movie',
+      '-metadata',
+      'artist=Me',
     ]);
   });
 
   it('prepends -map_metadata -1 when clearing, before the new tags', () => {
     expect(buildMetadataArgs({ tags: { title: 'X' }, clear: true })).toEqual([
-      '-map_metadata', '-1',
-      '-metadata', 'title=X',
+      '-map_metadata',
+      '-1',
+      '-metadata',
+      'title=X',
     ]);
   });
 
@@ -33,7 +37,8 @@ describe('buildMetadataArgs', () => {
 
   it('keeps spaces and = in values without escaping', () => {
     expect(buildMetadataArgs({ tags: { comment: 'a = b c' }, clear: false })).toEqual([
-      '-metadata', 'comment=a = b c',
+      '-metadata',
+      'comment=a = b c',
     ]);
   });
 });
@@ -93,8 +98,14 @@ describe('setMetadata', () => {
   it('works on an audio-only file (no video stream)', async () => {
     const input = join(dir, 'audio-in.mp3');
     execFileSync('ffmpeg', [
-      '-y', '-loglevel', 'error',
-      '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2', input,
+      '-y',
+      '-loglevel',
+      'error',
+      '-f',
+      'lavfi',
+      '-i',
+      'sine=frequency=440:duration=2',
+      input,
     ]);
 
     const output = join(dir, 'audio-out.mp3');

@@ -14,9 +14,9 @@ This skill describes the public API **exactly** so you don't have to guess signa
 FFmpeg (providing both `ffmpeg` and `ffprobe`) **must be installed** on the machine and on `PATH`, or pointed at via the `FFMPEG_PATH` / `FFPROBE_PATH` environment variables. Requires **Node.js >= 22**. Dual ESM + CJS, fully typed.
 
 ```ts
-import { checkDependencies, FFmpegNotFoundError } from 'ffm-script'
+import { checkDependencies, FFmpegNotFoundError } from 'ffm-script';
 // Fail fast at startup: throws FFmpegNotFoundError (with install instructions) if missing.
-checkDependencies()
+checkDependencies();
 ```
 
 ## Conventions shared by every operation
@@ -40,7 +40,9 @@ checkDependencies()
 ```ts
 probe(file: string): Promise<ProbeResult>
 ```
+
 `ProbeResult`: `{ duration: number; size: number; bitrate: number; streams: Stream[]; video: VideoStream | null; audio: AudioStream | null; tags: Record<string,string> }`.
+
 - `Stream`: `{ index, type: 'video'|'audio'|'subtitle'|'data', codec, tags: Record<string,string> }`.
 - `VideoStream`: adds `width, height, fps, bitrate, rotation` (rotation normalized to [0,360)).
 - `AudioStream`: adds `sampleRate, channels, bitrate`.
@@ -53,6 +55,7 @@ setMetadata(input: string, output: string, options?: {
   signal?: AbortSignal
 }): Promise<void>
 ```
+
 Stream-copies everything (`-c copy`) → lossless, near-instant. Works on audio-only files too. Use the **same container** for output as input. Throws `InvalidOptionsError` if neither `tags` nor `clear` is given, or a key is empty / contains `=`.
 
 ### Transcode
@@ -69,6 +72,7 @@ convert(input: string, output: string, options?: {
   onProgress?, signal?
 }): Promise<void>
 ```
+
 - Output container from extension: `.mp4`/`.mov`/`.mkv`/`.webm`.
 - `quality` maps to libx264 CRF + speed: `high`=`-crf 18 -preset slow`, `balanced`=`-crf 23 -preset medium`, `small`=`-crf 28 -preset medium`. **Constant-quality**, so mutually exclusive with `videoBitrate` (throws `InvalidOptionsError` if both). `quality` requires an x264/x265-family codec.
 - An explicit codec a container can't carry (e.g. `libx264` into `.webm`) throws `InvalidFormatError`.
@@ -83,6 +87,7 @@ parallelConvert(input: string, output: string, options?: {
   onProgress?, signal?
 }): Promise<void>
 ```
+
 Keyframe-aware parallel transcoding: splits on keyframes, re-encodes chunks across workers, joins without re-encoding. Output: `.mp4`/`.mov`/`.mkv` only — **`.webm` is rejected** (`InvalidFormatError`); use `convert` for WebM. Inputs: MP4/MOV/WebM/MKV.
 
 **convert vs parallelConvert:** use `parallelConvert` for long videos on multi-core machines (large speedup). Use `convert` for short clips, WebM output, or when you need a precise single-pass encode.
@@ -97,6 +102,7 @@ trim(input: string, output: string, options: {   // options REQUIRED
   onProgress?, signal?
 }): Promise<void>
 ```
+
 Output must be `.mp4`. `fast` = stream copy, cuts on nearest keyframe (may be off by a few seconds, no re-encode). `precise` = re-encode, frame-accurate, slower.
 
 ```ts
@@ -107,6 +113,7 @@ extractAudio(input: string, output: string, options?: {
   signal?
 }): Promise<void>
 ```
+
 Output `.mp3` / `.aac` / `.m4a`. Accepts video or audio-only input.
 
 ```ts
@@ -116,6 +123,7 @@ thumbnail(input: string, output: string, options: {   // options REQUIRED
   signal?
 }): Promise<void>
 ```
+
 Output `.jpg` / `.png`.
 
 ```ts
@@ -124,6 +132,7 @@ concat(inputs: string[], output: string, options?: {  // inputs.length >= 2
   onProgress?, signal?
 }): Promise<void>
 ```
+
 Output must be `.mp4`. `fast` = concat demuxer (`-c copy`, needs identical codecs/params). `precise` = concat filter (re-encodes, handles heterogeneous inputs). `auto` probes and picks. `precise` needs all inputs to agree on having an audio track or none (else `InvalidOptionsError`).
 
 ### Rich media
@@ -138,6 +147,7 @@ overlay(input: string, output: string, options: {    // options REQUIRED
   onProgress?, signal?
 }): Promise<void>
 ```
+
 Output must be `.mp4`. Video re-encoded (libx264), audio stream-copied (silent inputs handled).
 
 ```ts
@@ -148,6 +158,7 @@ burnSubtitles(input: string, output: string, options?: {
   onProgress?, signal?
 }): Promise<void>
 ```
+
 `extractSubtitles` output `.srt`/`.vtt`/`.ass` (codec converted by extension). `burnSubtitles` output must be `.mp4` (video re-encoded, audio copied).
 
 ```ts
@@ -160,6 +171,7 @@ toAnimation(input: string, output: string, options?: {
   onProgress?, signal?
 }): Promise<void>
 ```
+
 Output `.gif` (per-clip generated palette) or `.webp` (animated WebP).
 
 ### Packaging
@@ -171,6 +183,7 @@ toHLS(input: string, outputDir: string, options: {   // options REQUIRED
   onProgress?, signal?
 }): Promise<void>
 ```
+
 Writes `outputDir/master.m3u8` + one variant folder (playlist + `.ts`) per resolution.
 
 ### Escape hatches
@@ -181,6 +194,7 @@ run(args: string[], options?: {
   onProgress?, signal?, timeout?: number  // timeout ms -> SIGKILL -> FFmpegTimeoutError
 }): Promise<string>   // resolves with captured stdout
 ```
+
 Raw arbitrary FFmpeg args, verbatim — you own inputs, output, and any `-y`. Keeps progress/abort/timeout/typed errors. Throws `InvalidOptionsError` if `args` is empty.
 
 ```ts
@@ -190,6 +204,7 @@ runStream(args: string[], options?: {
   duration?, onProgress?, signal?, timeout?
 }): Promise<void>
 ```
+
 Streaming counterpart to `run`: data flows through the process **without buffering in memory** (bounded footprint for huge files). **Pipes can't seek** → use a streamable format: MPEG-TS, Matroska, or fragmented MP4 (`-movflags frag_keyframe+empty_moov`) for piped output; a linearly-decodable input for piped input. A plain `moov`-at-end MP4 cannot be piped.
 
 ### Chainable API
@@ -203,6 +218,7 @@ ffmscript(input: string)
   .raw(args: string[])          // inject raw flags on the output side; forces re-encode
   .save(output: string, options?: { onProgress?, signal? }): Promise<void>
 ```
+
 Fuses `trim` + `convert` into a **single** FFmpeg pass. Order-independent. Output must be `.mp4`. `.save()` throws `InvalidOptionsError` if no operation was queued. `.raw()` flags are appended after generated ones, so explicit flags win (a `-vf` overrides the scale from `.convert({ width })`).
 
 ### Building blocks (advanced)
@@ -213,22 +229,22 @@ Fuses `trim` + `convert` into a **single** FFmpeg pass. Order-independent. Outpu
 
 All extend `FfmScriptError`. Catch the base, or narrow:
 
-| Error | When |
-|---|---|
+| Error                 | When                                                                 |
+| --------------------- | -------------------------------------------------------------------- |
 | `FFmpegNotFoundError` | `ffmpeg`/`ffprobe` not found (message includes install instructions) |
-| `FileNotFoundError` | input file missing |
-| `InvalidFormatError` | unsupported extension / incompatible codec+container |
-| `InvalidOptionsError` | bad options (timestamp, range, width, mutually-exclusive opts…) |
-| `FFmpegError` | FFmpeg exited non-zero — has `.stderr` and `.exitCode` |
-| `FFmpegTimeoutError` | a `run`/`runStream` exceeded `timeout` — has `.duration` (ms) |
+| `FileNotFoundError`   | input file missing                                                   |
+| `InvalidFormatError`  | unsupported extension / incompatible codec+container                 |
+| `InvalidOptionsError` | bad options (timestamp, range, width, mutually-exclusive opts…)      |
+| `FFmpegError`         | FFmpeg exited non-zero — has `.stderr` and `.exitCode`               |
+| `FFmpegTimeoutError`  | a `run`/`runStream` exceeded `timeout` — has `.duration` (ms)        |
 
 ```ts
-import { FFmpegError, FFmpegNotFoundError } from 'ffm-script'
+import { FFmpegError, FFmpegNotFoundError } from 'ffm-script';
 try {
-  await convert('in.mp4', 'out.mp4')
+  await convert('in.mp4', 'out.mp4');
 } catch (err) {
-  if (err instanceof FFmpegNotFoundError) console.error(err.message)
-  if (err instanceof FFmpegError) console.error(err.exitCode, err.stderr)
+  if (err instanceof FFmpegNotFoundError) console.error(err.message);
+  if (err instanceof FFmpegError) console.error(err.exitCode, err.stderr);
 }
 ```
 
@@ -236,58 +252,89 @@ try {
 
 ```ts
 import {
-  probe, convert, parallelConvert, trim, extractAudio, thumbnail,
-  toHLS, overlay, burnSubtitles, toAnimation, concat, setMetadata,
-  run, runStream, ffmscript,
-} from 'ffm-script'
+  probe,
+  convert,
+  parallelConvert,
+  trim,
+  extractAudio,
+  thumbnail,
+  toHLS,
+  overlay,
+  burnSubtitles,
+  toAnimation,
+  concat,
+  setMetadata,
+  run,
+  runStream,
+  ffmscript,
+} from 'ffm-script';
 
 // Inspect
-const info = await probe('in.mp4')           // info.duration, info.video?.width, info.tags.title
+const info = await probe('in.mp4'); // info.duration, info.video?.width, info.tags.title
 
 // Transcode + resize, with a quality preset
-await convert('in.mp4', 'out.mp4', { quality: 'balanced', width: 1280 })
+await convert('in.mp4', 'out.mp4', { quality: 'balanced', width: 1280 });
 
 // Fast parallel transcode of a long video (multi-core)
-await parallelConvert('movie.mkv', 'out.mp4', { workers: 4, quality: 'balanced' })
+await parallelConvert('movie.mkv', 'out.mp4', { workers: 4, quality: 'balanced' });
 
 // Transcode to WebM (use convert, NOT parallelConvert)
-await convert('in.mp4', 'out.webm')          // VP9 + Opus by default
+await convert('in.mp4', 'out.webm'); // VP9 + Opus by default
 
 // Precise cut
-await trim('in.mp4', 'cut.mp4', { start: '00:01:00', end: '00:03:00', mode: 'precise' })
+await trim('in.mp4', 'cut.mp4', { start: '00:01:00', end: '00:03:00', mode: 'precise' });
 
 // One-pass trim + resize
-await ffmscript('in.mp4').trim({ start: 60, end: 180 }).convert({ width: 1280 }).save('out.mp4')
+await ffmscript('in.mp4').trim({ start: 60, end: 180 }).convert({ width: 1280 }).save('out.mp4');
 
 // Audio, thumbnail, GIF
-await extractAudio('in.mp4', 'out.mp3', { bitrate: '320k' })
-await thumbnail('in.mp4', 'thumb.jpg', { timestamp: 30, width: 640 })
-await toAnimation('in.mp4', 'clip.gif', { start: 3, end: 6, fps: 12, width: 480 })
+await extractAudio('in.mp4', 'out.mp3', { bitrate: '320k' });
+await thumbnail('in.mp4', 'thumb.jpg', { timestamp: 30, width: 640 });
+await toAnimation('in.mp4', 'clip.gif', { start: 3, end: 6, fps: 12, width: 480 });
 
 // HLS ladder
 await toHLS('in.mp4', './hls/', {
-  resolutions: [{ width: 1920, bitrate: '5000k' }, { width: 1280, bitrate: '2500k' }],
-})
+  resolutions: [
+    { width: 1920, bitrate: '5000k' },
+    { width: 1280, bitrate: '2500k' },
+  ],
+});
 
 // Watermark, burn subtitles
-await overlay('in.mp4', 'out.mp4', { watermark: 'logo.png', position: 'bottom-right', opacity: 0.6 })
-await burnSubtitles('in.mp4', 'out.mp4', { subtitles: 'subs.srt' })
+await overlay('in.mp4', 'out.mp4', {
+  watermark: 'logo.png',
+  position: 'bottom-right',
+  opacity: 0.6,
+});
+await burnSubtitles('in.mp4', 'out.mp4', { subtitles: 'subs.srt' });
 
 // Join files
-await concat(['intro.mp4', 'main.mp4', 'outro.mp4'], 'out.mp4', { mode: 'auto' })
+await concat(['intro.mp4', 'main.mp4', 'outro.mp4'], 'out.mp4', { mode: 'auto' });
 
 // Tags (lossless)
-await setMetadata('in.mp4', 'out.mp4', { tags: { title: 'My Movie', artist: 'Me' } })
+await setMetadata('in.mp4', 'out.mp4', { tags: { title: 'My Movie', artist: 'Me' } });
 
 // Escape hatch
-await run(['-i', 'in.mp4', '-vf', 'scale=1280:-2', '-crf', '18', '-y', 'out.mp4'], { duration: 124 })
+await run(['-i', 'in.mp4', '-vf', 'scale=1280:-2', '-crf', '18', '-y', 'out.mp4'], {
+  duration: 124,
+});
 
 // Streaming, bounded memory (note the fragmented-MP4 flags for pipe output)
-import { createReadStream, createWriteStream } from 'node:fs'
+import { createReadStream, createWriteStream } from 'node:fs';
 await runStream(
-  ['-i', 'pipe:0', '-c:v', 'libx264', '-movflags', 'frag_keyframe+empty_moov', '-f', 'mp4', 'pipe:1'],
+  [
+    '-i',
+    'pipe:0',
+    '-c:v',
+    'libx264',
+    '-movflags',
+    'frag_keyframe+empty_moov',
+    '-f',
+    'mp4',
+    'pipe:1',
+  ],
   { input: createReadStream('big.mov'), output: createWriteStream('out.mp4') },
-)
+);
 ```
 
 ## Gotchas to avoid

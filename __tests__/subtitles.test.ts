@@ -18,7 +18,7 @@ Second cue
 `;
 
 describe('escapeSubtitlesPath', () => {
-  it('escapes the filtergraph metacharacters \\ : and \'', () => {
+  it("escapes the filtergraph metacharacters \\ : and '", () => {
     expect(escapeSubtitlesPath('/tmp/a/subs.srt')).toBe('/tmp/a/subs.srt'); // nothing to escape
     expect(escapeSubtitlesPath("C:\\subs's.srt")).toBe("C\\:\\\\subs\\'s.srt");
   });
@@ -46,10 +46,21 @@ describe('subtitles operations', () => {
     withSubs = join(dir, 'with-subs.mkv');
     // Mux the SRT into the sample as an embedded subtitle stream.
     execFileSync('ffmpeg', [
-      '-y', '-loglevel', 'error',
-      '-i', SAMPLE, '-i', srt,
-      '-map', '0', '-map', '1',
-      '-c', 'copy', '-c:s', 'srt',
+      '-y',
+      '-loglevel',
+      'error',
+      '-i',
+      SAMPLE,
+      '-i',
+      srt,
+      '-map',
+      '0',
+      '-map',
+      '1',
+      '-c',
+      'copy',
+      '-c:s',
+      'srt',
       withSubs,
     ]);
   });
@@ -84,9 +95,9 @@ describe('subtitles operations', () => {
     }, 30_000);
 
     it('throws InvalidOptionsError when the track is out of range', async () => {
-      await expect(extractSubtitles(withSubs, join(dir, 'x.srt'), { track: 5 })).rejects.toBeInstanceOf(
-        InvalidOptionsError,
-      );
+      await expect(
+        extractSubtitles(withSubs, join(dir, 'x.srt'), { track: 5 }),
+      ).rejects.toBeInstanceOf(InvalidOptionsError);
     }, 30_000);
 
     it('throws InvalidFormatError for an unsupported output extension', async () => {
@@ -100,7 +111,10 @@ describe('subtitles operations', () => {
     it('burns an external subtitle file, keeping duration and audio', async () => {
       const out = join(dir, 'burn-ext.mp4');
       const percents: number[] = [];
-      await burnSubtitles(SAMPLE, out, { subtitles: srt, onProgress: (p) => percents.push(p.percent) });
+      await burnSubtitles(SAMPLE, out, {
+        subtitles: srt,
+        onProgress: (p) => percents.push(p.percent),
+      });
 
       const info = await probe(out);
       expect(info.video?.codec).toBe('h264');
@@ -129,9 +143,9 @@ describe('subtitles operations', () => {
     }, 30_000);
 
     it('throws InvalidFormatError when the output is not an .mp4', async () => {
-      await expect(burnSubtitles(SAMPLE, join(dir, 'x.mkv'), { subtitles: srt })).rejects.toBeInstanceOf(
-        InvalidFormatError,
-      );
+      await expect(
+        burnSubtitles(SAMPLE, join(dir, 'x.mkv'), { subtitles: srt }),
+      ).rejects.toBeInstanceOf(InvalidFormatError);
     });
 
     it('throws FileNotFoundError when the external subtitle file is missing', async () => {

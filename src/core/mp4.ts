@@ -151,7 +151,8 @@ function sampleStartTimes(stts: SttsRun[], samples: number[], timescale: number)
       runIndex += 1;
       run = stts[runIndex];
     }
-    const time = run === undefined ? runFirstTime : runFirstTime + (sample - runFirstSample) * run.delta;
+    const time =
+      run === undefined ? runFirstTime : runFirstTime + (sample - runFirstSample) * run.delta;
     out.push(timescale > 0 ? time / timescale : 0);
   }
   return out;

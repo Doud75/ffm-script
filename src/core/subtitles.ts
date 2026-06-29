@@ -6,10 +6,7 @@
  * the escapes added afterwards aren't doubled.
  */
 export function escapeSubtitlesPath(path: string): string {
-  return path
-    .replace(/\\/g, '\\\\')
-    .replace(/:/g, '\\:')
-    .replace(/'/g, "\\'");
+  return path.replace(/\\/g, '\\\\').replace(/:/g, '\\:').replace(/'/g, "\\'");
 }
 
 /**
