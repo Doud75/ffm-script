@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
-  { ignores: ['dist', 'coverage', 'node_modules'] },
+  { ignores: ['dist', 'coverage', 'node_modules', 'examples/out'] },
 
   // Type-aware linting for the library source.
   {
@@ -35,6 +35,14 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
     },
+  },
+
+  // Examples aren't in the tsconfig `include` either — lint them syntactically,
+  // like the tests.
+  {
+    files: ['examples/**/*.ts'],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    ...tseslint.configs.disableTypeChecked,
   },
 
   // Disable formatting rules that conflict with Prettier (keep last).
