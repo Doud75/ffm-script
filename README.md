@@ -8,13 +8,28 @@ A modern, TypeScript-native wrapper around the **FFmpeg binary** for common medi
 
 - 🟦 **TypeScript-first** — strict types, full JSDoc, dual ESM + CJS builds.
 - 🪶 **Zero runtime dependencies** — it shells out to the FFmpeg binary you already have.
-- 🎯 **Focused API** — `probe`, `convert`, `trim`, `extractAudio`, `thumbnail`.
+- 🎯 **Fluent, chainable API** — `probe`, `convert`, `trim`, `extractAudio`, `thumbnail` and more.
+- 🤖 **AI-agent ready** — ships an [Agent Skill](#ai-agent-skill) so **Claude Code, Cursor & Codex** know the exact API instead of hallucinating options.
 - ⏳ **Progress & cancellation** — `onProgress` callbacks and `AbortSignal` support.
 - 🧱 **Typed errors** — catch exactly what went wrong.
 
-## Why this exists
+## Quick start
 
-`fluent-ffmpeg` was the de-facto way to drive FFmpeg from Node, but it was archived in May 2025. The remaining options are low-level native C bindings (`node-av`, `@mmomtchev/ffmpeg`) — powerful but complex and segfault-prone — or `ffmpeg.wasm`, which doesn't run server-side in Node. `ffm-script` fills that gap with a small, high-level API that wraps the FFmpeg **binary** for the operations applications actually need.
+```ts
+import { ffmscript } from 'ffm-script';
+
+// Fluent, typed, and zero-dependency
+await ffmscript('input.mp4')
+  .trim({ start: 60, end: 180 })
+  .convert({ width: 1280, quality: 'high' })
+  .save('output.mp4', { onProgress: (p) => console.log(`${p.percent}%`) });
+```
+
+Chained `trim` + `convert` run in a **single** FFmpeg pass, not one process per step. Prefer standalone functions? Every operation is also exported on its own — jump to [Usage](#usage).
+
+## The best fluent-ffmpeg alternative in 2026
+
+`fluent-ffmpeg` was the de-facto way to drive FFmpeg from Node, but it was archived in May 2025. The remaining options are low-level native C bindings (`node-av`, `@mmomtchev/ffmpeg`) — powerful but complex and segfault-prone — or `ffmpeg.wasm`, which doesn't run server-side in Node. `ffm-script` is the modern, TypeScript-native replacement: a small, high-level API that wraps the FFmpeg **binary** for the operations applications actually need.
 
 ## Prerequisites
 
