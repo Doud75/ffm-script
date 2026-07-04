@@ -5,10 +5,14 @@ import { join } from 'node:path';
 import {
   parallelConvert,
   resolveWorkers,
+  resolveConcurrency,
+  resolveRetries,
+  resolveRetryDelay,
   planSegmentCount,
   aggregateProgress,
 } from '../src/operations/parallel.js';
 import { planSegments } from '../src/core/segments.js';
+import type { SegmentExecutor } from '../src/core/segments.js';
 import { probe } from '../src/operations/probe.js';
 import { FileNotFoundError, InvalidFormatError, InvalidOptionsError } from '../src/errors/index.js';
 import { SAMPLE } from './helpers.js';
@@ -102,6 +106,56 @@ describe('resolveWorkers', () => {
   });
 });
 
+describe('resolveConcurrency', () => {
+  it('falls back to the core-based default when omitted', () => {
+    expect(resolveConcurrency(undefined, 4)).toBe(4);
+  });
+
+  it('honours a requested count without capping it to the local cores', () => {
+    expect(resolveConcurrency(3, 4)).toBe(3);
+    // Remote workers aren't bound by this machine's CPU — no cap, unlike resolveWorkers.
+    expect(resolveConcurrency(100, 4)).toBe(100);
+  });
+
+  it('throws InvalidOptionsError for a non-positive or non-integer count', () => {
+    expect(() => resolveConcurrency(0, 4)).toThrow(InvalidOptionsError);
+    expect(() => resolveConcurrency(-1, 4)).toThrow(InvalidOptionsError);
+    expect(() => resolveConcurrency(2.5, 4)).toThrow(InvalidOptionsError);
+  });
+});
+
+describe('resolveRetries', () => {
+  it('defaults to 0 (a single attempt) when omitted', () => {
+    expect(resolveRetries(undefined)).toBe(0);
+  });
+
+  it('accepts a non-negative integer', () => {
+    expect(resolveRetries(0)).toBe(0);
+    expect(resolveRetries(3)).toBe(3);
+  });
+
+  it('throws InvalidOptionsError for a negative or non-integer count', () => {
+    expect(() => resolveRetries(-1)).toThrow(InvalidOptionsError);
+    expect(() => resolveRetries(1.5)).toThrow(InvalidOptionsError);
+  });
+});
+
+describe('resolveRetryDelay', () => {
+  it('defaults to 0 when omitted', () => {
+    expect(resolveRetryDelay(undefined)).toBe(0);
+  });
+
+  it('accepts a non-negative number of milliseconds', () => {
+    expect(resolveRetryDelay(0)).toBe(0);
+    expect(resolveRetryDelay(250)).toBe(250);
+  });
+
+  it('throws InvalidOptionsError for a negative or non-finite delay', () => {
+    expect(() => resolveRetryDelay(-1)).toThrow(InvalidOptionsError);
+    expect(() => resolveRetryDelay(Number.POSITIVE_INFINITY)).toThrow(InvalidOptionsError);
+  });
+});
+
 describe('parallelConvert', () => {
   let dir: string;
 
@@ -132,6 +186,15 @@ describe('parallelConvert', () => {
       expect(percents[i]!).toBeGreaterThanOrEqual(percents[i - 1]!);
     }
     expect(Math.max(...percents)).toBeGreaterThan(90);
+  }, 60_000);
+
+  it('applies a quality preset (CRF) to every chunk', async () => {
+    const output = join(dir, 'out-quality.mp4');
+    await parallelConvert(SAMPLE, output, { workers: 2, quality: 'small' });
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.duration).toBeCloseTo(10, 0);
   }, 60_000);
 
   it('scales every chunk to the requested width while preserving the aspect ratio', async () => {
@@ -261,6 +324,170 @@ describe('parallelConvert', () => {
     await expect(
       parallelConvert(SAMPLE, join(dir, 'x.mp4'), { workers: 0 }),
     ).rejects.toBeInstanceOf(InvalidOptionsError);
+  });
+
+  it('routes every chunk through a custom executor and joins the returned chunks', async () => {
+    const output = join(dir, 'out-executor.mp4');
+    const calls: {
+      index: number;
+      duration: number;
+      hasSignal: boolean;
+      encodeArgs: string[];
+    }[] = [];
+    const controller = new AbortController();
+
+    // A user-supplied executor builds the full command from the public contract
+    // (input + encodeArgs + segment timing) and returns the chunk path — the same
+    // shape a remote worker would use, exercised locally here.
+    const executor: SegmentExecutor = (segment, ctx) => {
+      calls.push({
+        index: segment.index,
+        duration: ctx.duration,
+        hasSignal: ctx.signal !== undefined,
+        encodeArgs: ctx.encodeArgs,
+      });
+      const chunk = join(dir, `exec_chunk_${String(segment.index)}.mp4`);
+      execFileSync('ffmpeg', [
+        '-loglevel',
+        'error',
+        '-ss',
+        String(segment.startTime),
+        '-i',
+        ctx.input,
+        ...(segment.endTime !== undefined ? ['-t', String(ctx.duration)] : []),
+        ...ctx.encodeArgs,
+        '-y',
+        chunk,
+      ]);
+      return Promise.resolve(chunk);
+    };
+
+    await parallelConvert(SAMPLE, output, {
+      executor,
+      concurrency: 3,
+      targetBitrate: '800k',
+      signal: controller.signal,
+    });
+
+    // `concurrency` (not the local core count) drives the split:
+    // planSegmentCount(3, 10, keyframes) → 3 segments.
+    expect(calls).toHaveLength(3);
+    expect(calls.map((c) => c.index).sort((a, b) => a - b)).toEqual([0, 1, 2]);
+    for (const c of calls) {
+      // The shared encode contract is passed through, bitrate included.
+      expect(c.encodeArgs).toEqual(
+        expect.arrayContaining(['-an', '-c:v', 'libx264', '-b:v', '800k']),
+      );
+      expect(c.duration).toBeGreaterThan(0);
+      expect(c.hasSignal).toBe(true); // the abort signal reaches the executor
+    }
+
+    // The chunks the executor produced are joined into a valid, full-length MP4,
+    // with the audio still encoded in one local pass and muxed back.
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.audio?.codec).toBe('aac');
+    expect(info.duration).toBeCloseTo(10, 0);
+  }, 60_000);
+
+  it('propagates an executor failure (and still cleans up)', async () => {
+    const boom = new Error('remote worker exploded');
+    const executor: SegmentExecutor = () => Promise.reject(boom);
+    await expect(
+      parallelConvert(SAMPLE, join(dir, 'x.mp4'), { executor, concurrency: 2 }),
+    ).rejects.toBe(boom);
+  });
+
+  it('retries a failed segment and completes when the retry succeeds', async () => {
+    const output = join(dir, 'out-retry.mp4');
+    const attempts = new Map<number, number>();
+
+    // Each segment fails on its first attempt, then succeeds — a transient remote
+    // failure that `retries` should paper over.
+    const executor: SegmentExecutor = (segment, ctx) => {
+      const n = (attempts.get(segment.index) ?? 0) + 1;
+      attempts.set(segment.index, n);
+      if (n === 1) return Promise.reject(new Error('transient worker failure'));
+      const chunk = join(dir, `retry_chunk_${String(segment.index)}.mp4`);
+      execFileSync('ffmpeg', [
+        '-loglevel',
+        'error',
+        '-ss',
+        String(segment.startTime),
+        '-i',
+        ctx.input,
+        ...(segment.endTime !== undefined ? ['-t', String(ctx.duration)] : []),
+        ...ctx.encodeArgs,
+        '-y',
+        chunk,
+      ]);
+      return Promise.resolve(chunk);
+    };
+
+    await parallelConvert(SAMPLE, output, {
+      executor,
+      concurrency: 2, // → 2 segments
+      targetBitrate: '800k',
+      retries: 1,
+      retryDelay: 10, // exercises the inter-attempt wait
+      signal: new AbortController().signal, // fresh signal → the wait is signal-aware but never fires
+    });
+
+    const info = await probe(output);
+    expect(info.video?.codec).toBe('h264');
+    expect(info.duration).toBeCloseTo(10, 0);
+    // Every segment was attempted exactly twice: one failure, one success.
+    expect(attempts.size).toBe(2);
+    expect([...attempts.values()].every((v) => v === 2)).toBe(true);
+  }, 60_000);
+
+  it('gives up after exhausting the retries', async () => {
+    const boom = new Error('worker permanently down');
+    let calls = 0;
+    const executor: SegmentExecutor = () => {
+      calls++;
+      return Promise.reject(boom);
+    };
+    await expect(
+      parallelConvert(SAMPLE, join(dir, 'x.mp4'), { executor, concurrency: 2, retries: 2 }),
+    ).rejects.toBe(boom);
+    // At least retries + 1 attempts were made on the failing segment before giving up.
+    expect(calls).toBeGreaterThanOrEqual(3);
+  });
+
+  it('never retries an abort-shaped failure, even with retries set', async () => {
+    const attempts = new Map<number, number>();
+    const executor: SegmentExecutor = (segment) => {
+      attempts.set(segment.index, (attempts.get(segment.index) ?? 0) + 1);
+      return Promise.reject(new DOMException('Operation aborted', 'AbortError'));
+    };
+    await expect(
+      parallelConvert(SAMPLE, join(dir, 'x.mp4'), { executor, concurrency: 2, retries: 3 }),
+    ).rejects.toBeInstanceOf(DOMException);
+    // Aborts are intentional, so each segment is attempted once and never retried.
+    expect([...attempts.values()].every((v) => v === 1)).toBe(true);
+  });
+
+  it('stops retrying once the signal is aborted', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const attempts = new Map<number, number>();
+    const executor: SegmentExecutor = (segment) => {
+      attempts.set(segment.index, (attempts.get(segment.index) ?? 0) + 1);
+      return Promise.reject(new Error('worker error'));
+    };
+    await expect(
+      parallelConvert(SAMPLE, join(dir, 'x.mp4'), {
+        executor,
+        concurrency: 2,
+        retries: 3,
+        signal: controller.signal,
+      }),
+    ).rejects.toBeTruthy();
+    // With the run already aborted, the executor's failure is not retried — each
+    // segment is attempted once (the run rejects; which error wins the race doesn't
+    // matter, only that no retry happened).
+    expect([...attempts.values()].every((v) => v === 1)).toBe(true);
   });
 
   it('writes an MKV output by stream-copying the h264/aac joins', async () => {

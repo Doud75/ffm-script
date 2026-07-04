@@ -225,7 +225,47 @@ await parallelConvert('input.mp4', 'output.mp4', {
 });
 ```
 
-`workers` is optional. It defaults to **half the host's logical cores** (at least 1) so the machine stays usable during the transcode — each FFmpeg worker is itself multithreaded, so one worker per core would oversubscribe the CPU. A value above the core count is capped to it.
+> **Don't expect a speedup on a single machine.** FFmpeg (libx264) already saturates every core with its internal threading — splitting the video and running N local workers only re-shares the same cores. At equal settings, a local `parallelConvert` finishes in about the same time as `convert` (sometimes slightly slower, from the split/concat overhead). This is expected, not a bug.
+
+#### Performance model: one machine vs many
+
+The chunked model — the one YouTube and Netflix run — pays off when the chunks are encoded on **independent hardware**: compute power then adds up instead of being re-shared, and throughput scales near-linearly with the number of machines. `ffm-script` implements the building block (keyframe-accurate splitting, segment planning, chunks that re-join without re-encoding); the distribution itself — queue, remote workers, moving chunks around — is your orchestration layer.
+
+What `parallelConvert` guarantees locally is the **correctness** of that chunked pipeline: the output keeps the source duration and both tracks, with artefact-free joins and drift-free audio. That's the validation of the building block, not a speed promise.
+
+`workers` is optional. It defaults to **half the host's logical cores** (at least 1) so the machine stays usable during the transcode — each FFmpeg worker is itself multithreaded, so one worker per core would oversubscribe the CPU. That same internal threading is why adding local workers doesn't speed anything up. A value above the core count is capped to it.
+
+#### Distributing chunks across machines — `executor`
+
+To actually get that scaling, hand `parallelConvert` an `executor`: a function that encodes one segment and returns its chunk path. `parallelConvert` keeps doing everything else — planning the keyframe split, encoding the audio in one continuous pass, joining the chunks — and just calls your executor to produce each **video** chunk, so you decide _where_ each encode runs:
+
+```ts
+import { parallelConvert, type SegmentExecutor } from 'ffm-script';
+
+const executor: SegmentExecutor = async (segment, ctx) => {
+  // `segment` = { index, startTime, endTime? }; the last segment has no endTime (runs to EOF).
+  // `ctx.encodeArgs` = the shared video-encode flags every chunk must use, e.g.
+  //   ['-an', '-c:v', 'libx264', '-b:v', '2000k', '-vf', 'scale=1280:-2'].
+  // Dispatch it to a remote worker (HTTP, queue, …) that runs:
+  //   ffmpeg -ss <segment.startTime> -i <ctx.input> [-t <ctx.duration>] <ctx.encodeArgs> -y chunk.mp4
+  // then return the path to the retrieved chunk (readable on this machine for the join).
+  return sendToRemoteWorker(segment, ctx);
+};
+
+await parallelConvert('input.mp4', 'output.mp4', {
+  executor,
+  concurrency: 16, // segments in flight — NOT capped to local cores when an executor is set
+  targetBitrate: '2000k',
+  retries: 2, // re-attempt a segment whose (remote) encode fails, before giving up
+  retryDelay: 1000, // optional wait (ms) between attempts
+});
+```
+
+Without an `executor`, `parallelConvert` uses a built-in **local** executor (a plain FFmpeg process per chunk) — so a bare call is unchanged. Two rules the executor must respect: every chunk uses `ctx.encodeArgs` unchanged (identical encoding on all chunks is what lets the joins stream-copy), and the returned path must be readable by the machine running `parallelConvert` when it joins them. The audio is always encoded locally in one continuous pass and muxed back — never split across chunks, which would accumulate gaps and A/V drift.
+
+**Failure recovery.** Across a fleet, a worker dying mid-encode is normal. Set `retries` and a failed segment is re-attempted (calling your executor again, so a retrying executor can route it to a healthy worker); `retryDelay` spaces the attempts. An **aborted** run is never retried — cancellation is intentional. Without `retries`, the first failure rejects the whole call (the default, unchanged).
+
+Prefer the low-level pieces? `resolveKeyframes` and `planSegments` are also exported, so you can plan the split and run the joins yourself with [`concat`](#concatenate-files--concat) — the `executor` seam is just the ergonomic path that reuses `parallelConvert`'s audio handling and joining.
 
 `width` / `height` resize the output just like [`convert`](#transcode--convert) — set one to preserve the aspect ratio, or both to force exact dimensions. The same scale is applied to every chunk, so the joins stay artefact-free.
 

@@ -80,17 +80,33 @@ convert(input: string, output: string, options?: {
 ```ts
 parallelConvert(input: string, output: string, options?: {
   workers?: number       // default: half the host's logical cores (>=1), capped to core count
+  executor?: SegmentExecutor  // custom per-segment encoder → distribute chunks across machines; default = local FFmpeg
+  concurrency?: number   // segments in flight; only with a custom executor, NOT capped to core count
+  retries?: number       // re-attempt a failed segment N times (default 0); never retries an abort
+  retryDelay?: number    // ms to wait between retry attempts (default 0)
   targetBitrate?: string // -b:v; mutually exclusive with quality
   quality?: 'high' | 'balanced' | 'small'
   width?: number
   height?: number
   onProgress?, signal?
 }): Promise<void>
+
+// SegmentExecutor: encode one segment, return the chunk path (h264, same params for every chunk).
+type SegmentExecutor = (
+  segment: { index: number; startTime: number; endTime?: number },
+  ctx: {
+    input: string;        // source to encode from
+    encodeArgs: string[]; // shared video-encode flags every chunk must use verbatim
+    duration: number;     // segment length in seconds (use for -t; last segment runs to EOF)
+    onProgress?: (secondsProcessed: number) => void;
+    signal?: AbortSignal;
+  },
+) => Promise<string>;     // path to the produced chunk, readable where the join runs
 ```
 
 Keyframe-aware parallel transcoding: splits on keyframes, re-encodes chunks across workers, joins without re-encoding. Output: `.mp4`/`.mov`/`.mkv` only — **`.webm` is rejected** (`InvalidFormatError`); use `convert` for WebM. Inputs: MP4/MOV/WebM/MKV.
 
-**convert vs parallelConvert:** use `parallelConvert` for long videos on multi-core machines (large speedup). Use `convert` for short clips, WebM output, or when you need a precise single-pass encode.
+**convert vs parallelConvert:** `parallelConvert` gives **no speedup on a single machine** — FFmpeg (libx264) already saturates every core with its internal threading, so local workers only re-share the same cores. It is the building block of the distributed chunked pipeline (YouTube/Netflix model): pass an `executor` to run each segment's encode on independent machines (`parallelConvert` still plans the split, encodes the audio in one pass, and joins the chunks) and throughput scales near-linearly. Locally it guarantees the pipeline's correctness (duration kept, artefact-free joins, drift-free audio). For a plain local transcode, short clips, WebM output, or a precise single-pass encode, use `convert`.
 
 ### Edit
 
@@ -223,7 +239,7 @@ Fuses `trim` + `convert` into a **single** FFmpeg pass. Order-independent. Outpu
 
 ### Building blocks (advanced)
 
-`extractKeyframeIndex(file)`, `resolveKeyframes(file)`, `planSegments(keyframes, { segmentCount })` — the internals behind `parallelConvert`, plus the `Keyframe` / `Segment` types.
+`extractKeyframeIndex(file)`, `resolveKeyframes(file)`, `planSegments(keyframes, { segmentCount })` — the internals behind `parallelConvert`, plus the `Keyframe` / `Segment` types. To distribute the chunked pipeline, prefer the `executor` option on `parallelConvert` (it reuses the built-in audio pass + join); these primitives are the lower-level path if you want to plan the split and join (`concat({ mode: 'fast' })`) entirely yourself.
 
 ## Error hierarchy
 
@@ -275,7 +291,8 @@ const info = await probe('in.mp4'); // info.duration, info.video?.width, info.ta
 // Transcode + resize, with a quality preset
 await convert('in.mp4', 'out.mp4', { quality: 'balanced', width: 1280 });
 
-// Fast parallel transcode of a long video (multi-core)
+// Chunked transcode — validates the split/join pipeline; no speedup vs convert
+// on one machine (see "convert vs parallelConvert")
 await parallelConvert('movie.mkv', 'out.mp4', { workers: 4, quality: 'balanced' });
 
 // Transcode to WebM (use convert, NOT parallelConvert)
@@ -340,6 +357,7 @@ await runStream(
 ## Gotchas to avoid
 
 - Don't set both `quality` and `videoBitrate`/`targetBitrate` → `InvalidOptionsError`.
+- Don't reach for `parallelConvert` expecting a faster local encode — on one machine it performs like `convert`; its value is the distributed chunked pipeline.
 - Don't send `.webm` to `parallelConvert` → use `convert`.
 - `trim`, `overlay`, `burnSubtitles`, `concat`, and the chain `.save()` require a **`.mp4`** output.
 - `run`/`runStream` don't auto-probe — pass `duration` if you want a progress percentage.
