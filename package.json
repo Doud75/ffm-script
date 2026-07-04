@@ -74,6 +74,7 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "dev": "tsup --watch",
+    "examples": "tsx examples/run.ts",
     "prepublishOnly": "pnpm build && pnpm typecheck"
   },
   "devDependencies": {
@@ -86,6 +87,7 @@
     "prettier": "^3.9.1",
     "ts-jest": "^29.4.11",
     "tsup": "^8.5.1",
+    "tsx": "^4.20.6",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.0"
   }

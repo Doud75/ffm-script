@@ -57,6 +57,10 @@ pnpm add ffm-script
 
 ## Usage
 
+> **Runnable examples:** every snippet below has an executable counterpart in
+> [`examples/`](examples/) — one script per feature. Run them all against the
+> bundled fixture with `pnpm examples`, or one at a time: `pnpm examples trim`.
+
 ### Check FFmpeg is available
 
 Fail fast at startup with a clear, actionable message:
