@@ -1,0 +1,71 @@
+name: Bug report
+description: Report something that isn't working as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug! Please fill in the sections below
+        so we can reproduce and fix it quickly.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Pre-flight checklist
+      options:
+        - label: I have searched the [existing issues](https://github.com/Doud75/ffm-script/issues) and this isn't a duplicate.
+          required: true
+        - label: I am on the latest version of `ffm-script`.
+          required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Minimal code that reproduces the problem. Include the input file's format if relevant.
+      render: ts
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect to happen?
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: |
+        Please provide:
+        - `ffm-script` version
+        - Node.js version (`node --version`)
+        - FFmpeg version (`ffmpeg -version`, first line)
+        - OS and version
+      placeholder: |
+        ffm-script: 0.13.0
+        Node: v22.x
+        FFmpeg: 7.x
+        OS: macOS 15
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-output
+    attributes:
+      label: Error output / FFmpeg stderr
+      description: Any error message, stack trace, or FFmpeg stderr. This will be rendered as a code block.
+      render: shell
+    validations:
+      required: false

@@ -486,6 +486,10 @@ cp node_modules/ffm-script/skills/ffm-script/SKILL.md .claude/skills/ffm-script/
 
 For Codex or Cursor, use `.agents/skills/ffm-script/` instead. The agent then loads it automatically when you work with `ffm-script` code.
 
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, project layout, branch and commit conventions, and the checks CI expects before a pull request can be merged. Bugs and feature requests go through the [issue templates](https://github.com/Doud75/ffm-script/issues/new/choose).
+
 ## License
 
 MIT
