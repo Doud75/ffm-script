@@ -10,6 +10,47 @@ export interface Segment {
   endTime?: number;
 }
 
+/** Everything a {@link SegmentExecutor} needs to encode one segment. */
+export interface SegmentExecutorContext {
+  /** Source video to encode this segment from (the input passed to `parallelConvert`). */
+  input: string;
+  /**
+   * Shared FFmpeg video-encode flags for the chunk, *without* input, seek or
+   * output — e.g. `['-an', '-c:v', 'libx264', '-b:v', '2000k', '-vf', 'scale=1280:-2']`.
+   * Every segment gets the **same** flags, so all chunks share one encoding and the
+   * joins can be stream-copied. A worker wraps them into a full command:
+   * `ffmpeg -ss <segment.startTime> -i <input> [-t <duration>] <encodeArgs> -y <chunk>`
+   * — add `-t` only when `segment.endTime` is defined (the last segment runs to EOF).
+   */
+  encodeArgs: string[];
+  /** Segment length in seconds (`endTime - startTime`, or input end − `startTime` for the last). */
+  duration: number;
+  /**
+   * Report the seconds of this segment processed so far, feeding the aggregated
+   * `onProgress` of `parallelConvert`. Optional to call.
+   */
+  onProgress?: (secondsProcessed: number) => void;
+  /** Abort signal to honour; stop the encode when it fires. */
+  signal?: AbortSignal;
+}
+
+/**
+ * Encodes one segment and resolves with the path to the produced chunk. The chunk
+ * must be h264 with the same parameters as every other chunk (see
+ * {@link SegmentExecutorContext.encodeArgs}) so `parallelConvert` can join them
+ * with a stream copy, and the returned path must be readable by the machine
+ * running `parallelConvert` when the join happens.
+ *
+ * `parallelConvert` uses a local FFmpeg executor by default. Supply your own to
+ * run the per-segment encodes wherever you like — dispatch each segment to a
+ * remote worker over your transport, then return the retrieved chunk path. That
+ * is how the chunked model scales past a single machine.
+ */
+export type SegmentExecutor = (
+  segment: Segment,
+  context: SegmentExecutorContext,
+) => Promise<string>;
+
 /**
  * Splits the timeline into roughly balanced contiguous segments whose
  * boundaries fall exactly on keyframes, so each chunk can be decoded

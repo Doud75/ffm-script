@@ -1,4 +1,5 @@
 import type { Readable, Writable } from 'node:stream';
+import type { SegmentExecutor } from '../core/segments.js';
 
 /** A single media stream within a file. */
 export interface Stream {
@@ -182,6 +183,36 @@ export interface ParallelConvertOptions {
   width?: number;
   /** Output height in pixels. If only one dimension is set, aspect ratio is preserved. */
   height?: number;
+  /**
+   * Custom per-segment encoder. Omitted → each chunk is encoded by a local FFmpeg
+   * process (the default). Supply one to distribute the chunk encodes across
+   * machines: `parallelConvert` still plans the keyframe split, encodes the audio
+   * in one continuous pass and joins the chunks — it just calls this to produce
+   * each video chunk instead of spawning FFmpeg locally. See {@link SegmentExecutor}.
+   */
+  executor?: SegmentExecutor;
+  /**
+   * How many segments to encode concurrently, and how finely the timeline is split.
+   * Only meaningful with a custom `executor`, where it replaces the core-based
+   * default and is **not** capped to the host's core count (remote workers aren't
+   * bound by this machine's CPU). Without an `executor`, local parallelism follows
+   * `workers` and this is ignored.
+   */
+  concurrency?: number;
+  /**
+   * How many times to re-attempt a segment whose encode fails before giving up.
+   * Defaults to `0` (a single attempt — the failure propagates immediately). Meant
+   * for distributed runs, where a remote worker can die mid-encode: each retry
+   * calls the `executor` again for that segment, so a retrying executor can route
+   * it to another worker. An aborted run is **never** retried.
+   */
+  retries?: number;
+  /**
+   * Milliseconds to wait between a failed attempt and the next retry. Defaults to
+   * `0` (retry immediately). Only applies when `retries` is set; the wait is
+   * interrupted by `signal`.
+   */
+  retryDelay?: number;
   /** Called with aggregated progress across all workers. */
   onProgress?: (progress: Progress) => void;
   /** Aborts the operation; the returned promise rejects with an `AbortError`. */

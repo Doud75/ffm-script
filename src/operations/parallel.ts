@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { cpus, tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
 import { concatDemuxer } from '../core/concat.js';
@@ -10,7 +11,12 @@ import { resolveOutputContainer } from '../core/container.js';
 import { validateInput } from '../core/validate.js';
 import { resolveKeyframes } from '../core/keyframes.js';
 import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
-import { planSegments, type Segment } from '../core/segments.js';
+import {
+  planSegments,
+  type Segment,
+  type SegmentExecutor,
+  type SegmentExecutorContext,
+} from '../core/segments.js';
 import { InvalidFormatError, InvalidOptionsError } from '../errors/index.js';
 import type { ParallelConvertOptions, Progress } from '../types/index.js';
 import { probe } from './probe.js';
@@ -36,6 +42,89 @@ export function resolveWorkers(requested: number | undefined, cpuCount: number):
     throw new InvalidOptionsError(`workers must be a positive integer (got ${requested})`);
   }
   return Math.min(requested, cpuCount);
+}
+
+/**
+ * Resolves the concurrency for a custom {@link SegmentExecutor}: how many segments
+ * are encoded at once (and how finely the timeline is split). Unlike
+ * {@link resolveWorkers} it is **not** capped to the local core count — remote
+ * workers aren't bound by this machine's CPU. Falls back to `fallback` (the
+ * core-based default) when omitted.
+ *
+ * @throws {InvalidOptionsError} when `requested` is not a positive integer.
+ */
+export function resolveConcurrency(requested: number | undefined, fallback: number): number {
+  if (requested === undefined) return fallback;
+  if (!Number.isInteger(requested) || requested < 1) {
+    throw new InvalidOptionsError(`concurrency must be a positive integer (got ${requested})`);
+  }
+  return requested;
+}
+
+/**
+ * Validates the retry count: how many times a failed segment is re-attempted
+ * before giving up. Defaults to `0` (a single attempt).
+ *
+ * @throws {InvalidOptionsError} when `requested` is not a non-negative integer.
+ */
+export function resolveRetries(requested: number | undefined): number {
+  if (requested === undefined) return 0;
+  if (!Number.isInteger(requested) || requested < 0) {
+    throw new InvalidOptionsError(`retries must be a non-negative integer (got ${requested})`);
+  }
+  return requested;
+}
+
+/**
+ * Validates the delay (ms) between a failed attempt and the next retry. Defaults
+ * to `0` (retry immediately).
+ *
+ * @throws {InvalidOptionsError} when `requested` is not a non-negative number.
+ */
+export function resolveRetryDelay(requested: number | undefined): number {
+  if (requested === undefined) return 0;
+  if (!Number.isFinite(requested) || requested < 0) {
+    throw new InvalidOptionsError(
+      `retryDelay must be a non-negative number of milliseconds (got ${requested})`,
+    );
+  }
+  return requested;
+}
+
+/** True when `err` is an abort (a `DOMException` named `'AbortError'`) — never retry these. */
+function isAbortError(err: unknown): boolean {
+  return (
+    typeof err === 'object' && err !== null && (err as { name?: unknown }).name === 'AbortError'
+  );
+}
+
+/**
+ * Runs `attempt`, re-running it up to `retries` times when it rejects. An abort is
+ * intentional, never a transient failure, so it rethrows at once without retrying.
+ * Between attempts it waits `retryDelay` ms (interrupted by `signal`), and runs
+ * `onRetry` first (e.g. to reset that segment's reported progress).
+ */
+async function withRetry<T>(
+  attempt: () => Promise<T>,
+  retries: number,
+  retryDelay: number,
+  signal: AbortSignal | undefined,
+  onRetry: () => void,
+): Promise<T> {
+  // Built once (not at the call site) so the delayed retry is a single, fully
+  // exercised path — the aborted wait rejects, ending the retries.
+  const delayOptions: { signal?: AbortSignal } = {};
+  if (signal !== undefined) delayOptions.signal = signal;
+
+  for (let remaining = retries; ; remaining--) {
+    try {
+      return await attempt();
+    } catch (err) {
+      if (remaining <= 0 || signal?.aborted === true || isAbortError(err)) throw err;
+      onRetry();
+      if (retryDelay > 0) await sleep(retryDelay, undefined, delayOptions);
+    }
+  }
 }
 
 /** Extra segments per worker, so a slow chunk can't leave the pool idle. */
@@ -81,6 +170,16 @@ export function aggregateProgress(processedBySegment: number[], totalDuration: n
  * chunks in parallel (one FFmpeg worker each), then concatenating them without
  * re-encoding. Boundaries land on keyframes, so the joins are artefact-free.
  *
+ * Don't expect a speedup on a single machine: FFmpeg (libx264) already saturates
+ * every core with its internal threading, so local workers only re-share the same
+ * cores. This function is the local, correctness-validated form of the chunked
+ * model — the speedup comes from encoding the chunks on independent machines. Pass
+ * a custom `executor` to distribute the per-segment encodes: `parallelConvert`
+ * still plans the split, encodes the audio in one pass and joins the chunks, but
+ * calls the executor to produce each video chunk (see {@link SegmentExecutor}). Use
+ * `concurrency` to control how many run at once, uncapped by the local core count,
+ * and `retries` to re-attempt a segment whose (e.g. remote) encode fails.
+ *
  * Accepts MP4, MOV, WebM and MKV inputs — keyframes come from the ISOBMFF `stss`
  * box when available, otherwise from ffprobe. Output is MP4, MOV or MKV (chosen
  * from the output extension); the chunks are re-encoded to h264 and the audio to
@@ -89,10 +188,10 @@ export function aggregateProgress(processedBySegment: number[], totalDuration: n
  *
  * @param input - Path to the source video (MP4/MOV/WebM/MKV).
  * @param output - Path to the destination file; its extension picks the container (`.mp4`/`.mov`/`.mkv`).
- * @param options - Worker count, target bitrate/quality, output resolution, and progress/abort options.
+ * @param options - Worker/concurrency count, custom executor, retry policy, target bitrate/quality, output resolution, and progress/abort options.
  * @throws {FileNotFoundError} when `input` does not exist.
  * @throws {InvalidFormatError} when `input` is not a supported video container, the output extension is unsupported or WebM, or the input has no video keyframes.
- * @throws {InvalidOptionsError} when `workers` is not a positive integer.
+ * @throws {InvalidOptionsError} when `workers`/`concurrency` is not a positive integer, or `retries`/`retryDelay` is negative.
  * @throws {FFmpegError} when any FFmpeg process exits non-zero.
  */
 export async function parallelConvert(
@@ -110,16 +209,23 @@ export async function parallelConvert(
   }
   assertQualityBitrateExclusive(options.quality, options.targetBitrate);
 
-  const workers = resolveWorkers(options.workers, cpus().length);
+  const localWorkers = resolveWorkers(options.workers, cpus().length);
+  const concurrency =
+    options.executor !== undefined
+      ? resolveConcurrency(options.concurrency, localWorkers)
+      : localWorkers;
+  const retries = resolveRetries(options.retries);
+  const retryDelay = resolveRetryDelay(options.retryDelay);
 
   const keyframes = await resolveKeyframes(input);
   const { duration: totalDuration, audio } = await probe(input);
   const segments = planSegments(keyframes, {
-    segmentCount: planSegmentCount(workers, totalDuration, keyframes.length),
+    segmentCount: planSegmentCount(concurrency, totalDuration, keyframes.length),
   });
 
   const workDir = await mkdtemp(join(tmpdir(), 'ffm-parallel-'));
   try {
+    const executor = options.executor ?? createLocalExecutor(workDir);
     // The audio is encoded as a single continuous pass and muxed back at the end.
     // Splitting audio across the chunks would re-prime the AAC encoder at every
     // junction, accumulating gaps/drift and an A/V offset. Keeping it whole makes
@@ -128,7 +234,10 @@ export async function parallelConvert(
     const videoTarget = audioTrack === undefined ? output : join(workDir, 'video.mp4');
 
     await Promise.all([
-      transcodeSegments(input, segments, workDir, totalDuration, workers, options).then((chunks) =>
+      transcodeSegments(input, segments, totalDuration, concurrency, executor, options, {
+        retries,
+        retryDelay,
+      }).then((chunks) =>
         concatDemuxer(
           chunks,
           videoTarget,
@@ -147,58 +256,111 @@ export async function parallelConvert(
 }
 
 /**
- * Re-encodes the video of every segment, running at most `concurrency` workers at
- * once. There are usually more segments than workers, so the pool rebalances:
- * whenever a worker finishes a chunk it picks up the next one.
+ * Builds the shared per-chunk video-encode flags — the same for every segment so
+ * that all chunks come out with one encoding and the concat demuxer can
+ * stream-copy the joins. Excludes input, seek and output (the executor wraps those
+ * around it). Video-only (`-an`): the audio is handled separately, in one pass.
+ *
+ * The scale filter (when set) is identical on every chunk, and since all chunks
+ * share the source dimensions the `-2` placeholder resolves the same everywhere.
+ */
+function buildSegmentEncodeArgs(options: ParallelConvertOptions): string[] {
+  const args = ['-an', '-c:v', 'libx264'];
+  if (options.quality !== undefined) args.push(...qualityArgs(options.quality));
+  if (options.targetBitrate !== undefined) args.push('-b:v', options.targetBitrate);
+  const scale = buildScaleFilter(options.width, options.height);
+  if (scale !== undefined) args.push('-vf', scale);
+  return args;
+}
+
+/**
+ * The default {@link SegmentExecutor}: encodes each chunk with a local FFmpeg
+ * process into `workDir`, wrapping the shared encode args with the segment's seek
+ * and (for all but the final segment) its duration.
+ */
+function createLocalExecutor(workDir: string): SegmentExecutor {
+  const binary = resolveBinary('ffmpeg');
+  return async (segment, ctx) => {
+    const chunk = join(workDir, `chunk_${String(segment.index).padStart(4, '0')}.mp4`);
+    const args = [
+      '-ss',
+      String(segment.startTime),
+      '-i',
+      ctx.input,
+      // -t only for a bounded segment; the last one (no endTime) runs to EOF.
+      ...(segment.endTime !== undefined ? ['-t', String(ctx.duration)] : []),
+      ...ctx.encodeArgs,
+      '-y',
+      chunk,
+    ];
+    const report = ctx.onProgress;
+    await spawnFFmpeg({
+      binary,
+      args,
+      duration: ctx.duration,
+      ...(report !== undefined ? { onProgress: (p) => report(p.currentTime) } : {}),
+      ...(ctx.signal !== undefined ? { signal: ctx.signal } : {}),
+    });
+    return chunk;
+  };
+}
+
+/**
+ * Encodes every segment through `executor`, running at most `concurrency` at once.
+ * There are usually more segments than that, so the pool rebalances: whenever one
+ * finishes it picks up the next. A segment whose encode fails is re-attempted up
+ * to `retry.retries` times (never on abort). Progress is aggregated across
+ * segments, weighted by duration.
  *
  * Returns chunk paths in output order.
  */
 async function transcodeSegments(
   input: string,
   segments: Segment[],
-  workDir: string,
   totalDuration: number,
   concurrency: number,
+  executor: SegmentExecutor,
   options: ParallelConvertOptions,
+  retry: { retries: number; retryDelay: number },
 ): Promise<string[]> {
-  const binary = resolveBinary('ffmpeg');
   const chunks: string[] = [];
   const processedBySegment = new Array<number>(segments.length).fill(0);
+  const encodeArgs = buildSegmentEncodeArgs(options);
 
-  const reportAggregate = (index: number, currentTime: number): void => {
-    if (options.onProgress === undefined) return;
-    processedBySegment[index] = currentTime;
-    options.onProgress(aggregateProgress(processedBySegment, totalDuration));
-  };
+  // Captured (and narrowed) once: the per-segment reporter only exists when the
+  // caller wants progress, so there is no dead undefined-check on the hot path.
+  const onProgress = options.onProgress;
+  const reportAggregate =
+    onProgress !== undefined
+      ? (index: number, currentTime: number): void => {
+          processedBySegment[index] = currentTime;
+          onProgress(aggregateProgress(processedBySegment, totalDuration));
+        }
+      : undefined;
 
   await runPool(segments, concurrency, async (seg) => {
-    const chunk = join(workDir, `chunk_${String(seg.index).padStart(4, '0')}.mp4`);
-    chunks[seg.index] = chunk;
-
-    const chunkDuration =
+    const duration =
       seg.endTime !== undefined ? seg.endTime - seg.startTime : totalDuration - seg.startTime;
-    // Video-only chunk (-an): audio is handled separately, in one pass.
-    const args = ['-ss', String(seg.startTime), '-i', input];
-    if (seg.endTime !== undefined) args.push('-t', String(chunkDuration));
-    args.push('-an', '-c:v', 'libx264');
-    if (options.quality !== undefined) args.push(...qualityArgs(options.quality));
-    if (options.targetBitrate !== undefined) args.push('-b:v', options.targetBitrate);
-    // Same scale filter on every chunk → uniform resolution, so the concat
-    // demuxer can still stream-copy the joins. All chunks share the source
-    // dimensions, so the `-2` placeholder resolves identically everywhere.
-    const scale = buildScaleFilter(options.width, options.height);
-    if (scale !== undefined) args.push('-vf', scale);
-    args.push('-y', chunk);
-
-    await spawnFFmpeg({
-      binary,
-      args,
-      duration: chunkDuration,
-      ...(options.onProgress !== undefined
-        ? { onProgress: (p) => reportAggregate(seg.index, p.currentTime) }
+    const ctx: SegmentExecutorContext = {
+      input,
+      encodeArgs,
+      duration,
+      ...(reportAggregate !== undefined
+        ? { onProgress: (secondsProcessed: number) => reportAggregate(seg.index, secondsProcessed) }
         : {}),
       ...(options.signal !== undefined ? { signal: options.signal } : {}),
-    });
+    };
+    chunks[seg.index] = await withRetry(
+      () => executor(seg, ctx),
+      retry.retries,
+      retry.retryDelay,
+      options.signal,
+      // A failed attempt may have reported partial seconds — reset so the retry
+      // doesn't leave a stale count inflating the aggregate.
+      () => {
+        processedBySegment[seg.index] = 0;
+      },
+    );
   });
 
   return chunks;

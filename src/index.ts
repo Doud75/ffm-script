@@ -17,6 +17,6 @@ export { parallelConvert } from './operations/parallel.js';
 export { extractKeyframeIndex } from './core/mp4.js';
 export { resolveKeyframes } from './core/keyframes.js';
 export { planSegments } from './core/segments.js';
-export type { Segment } from './core/segments.js';
+export type { Segment, SegmentExecutor, SegmentExecutorContext } from './core/segments.js';
 export * from './types/index.js';
 export * from './errors/index.js';

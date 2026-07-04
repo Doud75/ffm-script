@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-07-04
+
+### Added
+
+- **Distributed executor for `parallelConvert`.** New `executor` option: a `SegmentExecutor` that encodes one keyframe-bounded segment and returns its chunk path. `parallelConvert` still plans the split, encodes the audio in one continuous pass and joins the chunks — it just delegates each video chunk to the executor instead of spawning FFmpeg locally, so you can dispatch the per-segment encodes across independent machines. That is where the chunked model actually scales: on a single machine it doesn't speed anything up (libx264 already saturates the CPU with its internal threading). The default is the built-in local executor, so existing calls are unchanged. The companion `concurrency` option sets how many segments run at once (and how finely the timeline is split), **uncapped** by the host's core count for remote fan-out. New public types `SegmentExecutor` / `SegmentExecutorContext`.
+- **Failure recovery for `parallelConvert`.** New `retries` option re-attempts a segment whose encode fails (calling the `executor` again, so a retrying executor can route it to a healthy worker) — for distributed runs where a remote worker can die mid-encode. `retryDelay` spaces the attempts (ms). An **aborted** run is never retried. Defaults to `0` (a single attempt: the first failure rejects the call, as before).
+
 ## [0.11.0] - 2026-06-29
 
 ### Added
