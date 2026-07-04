@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or usage help
+    url: https://github.com/Doud75/ffm-script#readme
+    about: Check the README for the API, supported formats, and recipes before opening an issue.
