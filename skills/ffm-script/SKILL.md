@@ -22,7 +22,7 @@ checkDependencies();
 ## Conventions shared by every operation
 
 - Most operations are `(input, output, options?) => Promise<void>` and **overwrite** the output.
-- `onProgress?: (p: { percent: number; currentTime: number; totalTime: number }) => void` — `percent` is clamped to [0, 100].
+- `onProgress?: (p: { percent: number; currentTime: number; totalTime: number; fps?: number; speed?: number; bitrate?: number; eta?: number }) => void` — `percent` is clamped to [0, 100]. `fps`, `speed` (× realtime), `bitrate` (bits/s) and `eta` (seconds remaining) are added when FFmpeg reports them (the first frames omit them).
 - `signal?: AbortSignal` — aborting kills FFmpeg and rejects with a `DOMException` named `'AbortError'` (SIGTERM, lets FFmpeg clean up).
 - Inputs are validated **before** FFmpeg is spawned (existence, extension, ranges) → fast typed errors, never raw stderr.
 
