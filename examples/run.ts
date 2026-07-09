@@ -3,6 +3,7 @@ import { section, log } from './_shared.js';
 
 import probe from './probe.js';
 import convert from './convert.js';
+import progress from './progress.js';
 import trim from './trim.js';
 import extractAudio from './extract-audio.js';
 import thumbnail from './thumbnail.js';
@@ -26,6 +27,7 @@ interface Example {
 const examples: Example[] = [
   { name: 'probe', run: probe },
   { name: 'convert', run: convert },
+  { name: 'progress', run: progress },
   { name: 'trim', run: trim },
   { name: 'extract-audio', run: extractAudio },
   { name: 'thumbnail', run: thumbnail },

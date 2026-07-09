@@ -18,8 +18,12 @@ export interface SpawnOptions {
   timeout?: number;
 }
 
-// Matches FFmpeg progress lines, e.g. "time=00:01:23.45".
+// Fields FFmpeg prints on its stderr status line, e.g.
+// "frame=  120 fps= 30 q=28.0 size=  512kB time=00:00:04.00 bitrate= 524.3kbits/s speed=1.5x".
 const TIME_RE = /time=(\d{2}):(\d{2}):(\d{2})\.(\d{2})/;
+const FPS_RE = /fps=\s*([\d.]+)/;
+const SPEED_RE = /speed=\s*([\d.]+)x/;
+const BITRATE_RE = /bitrate=\s*([\d.]+)kbits\/s/;
 
 /**
  * Runs an FFmpeg/ffprobe process and resolves with its captured stdout.
@@ -246,6 +250,53 @@ function abortError(): DOMException {
   return new DOMException('Operation aborted', 'AbortError');
 }
 
+/**
+ * Parses one FFmpeg stderr status line into a {@link Progress}, or returns
+ * `null` when the line carries no `time=` field. Pure (no I/O), so it is
+ * unit-tested directly against synthetic status lines.
+ *
+ * Beyond the percentage, it opportunistically enriches the result with the
+ * `fps`, `speed` and `bitrate` FFmpeg prints on the same line, and derives an
+ * `eta` (seconds remaining) from the speed. Fields FFmpeg reports as `N/A`
+ * (the first frames) or that are absent are simply omitted.
+ */
+export function parseProgress(text: string, duration: number): Progress | null {
+  const time = TIME_RE.exec(text);
+  if (time === null) return null;
+
+  const [, hh, mm, ss, cs] = time;
+  const currentTime =
+    Number(hh ?? 0) * 3600 + Number(mm ?? 0) * 60 + Number(ss ?? 0) + Number(cs ?? 0) / 100;
+  const percent = Math.min(100, (currentTime / duration) * 100);
+
+  const progress: Progress = { percent, currentTime, totalTime: duration };
+
+  const fps = matchNumber(FPS_RE, text);
+  if (fps !== undefined) progress.fps = fps;
+
+  const speed = matchNumber(SPEED_RE, text);
+  if (speed !== undefined) progress.speed = speed;
+
+  // FFmpeg reports bitrate in kbit/s; expose bit/s to match `VideoStream.bitrate`.
+  const bitrate = matchNumber(BITRATE_RE, text);
+  if (bitrate !== undefined) progress.bitrate = bitrate * 1000;
+
+  // ETA only makes sense with a positive speed: seconds left ÷ the speed multiple.
+  if (speed !== undefined && speed > 0) {
+    progress.eta = Math.max(0, (duration - currentTime) / speed);
+  }
+
+  return progress;
+}
+
+/** Extracts the first capture group of `re` as a finite number, else `undefined`. */
+function matchNumber(re: RegExp, text: string): number | undefined {
+  const match = re.exec(text);
+  if (match === null) return undefined;
+  const n = Number(match[1]);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 function reportProgress(
   text: string,
   duration: number | undefined,
@@ -253,12 +304,6 @@ function reportProgress(
 ): void {
   if (onProgress === undefined || duration === undefined) return;
 
-  const match = TIME_RE.exec(text);
-  if (match === null) return;
-
-  const [, hh, mm, ss, cs] = match;
-  const currentTime =
-    Number(hh ?? 0) * 3600 + Number(mm ?? 0) * 60 + Number(ss ?? 0) + Number(cs ?? 0) / 100;
-  const percent = Math.min(100, (currentTime / duration) * 100);
-  onProgress({ percent, currentTime, totalTime: duration });
+  const progress = parseProgress(text, duration);
+  if (progress !== null) onProgress(progress);
 }

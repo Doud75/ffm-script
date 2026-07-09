@@ -1,5 +1,6 @@
 import { spawnFFmpeg } from '../src/core/spawn.js';
 import { FFmpegError, FFmpegTimeoutError } from '../src/errors/index.js';
+import type { Progress } from '../src/index.js';
 
 // Use the running Node binary as a stand-in for ffmpeg/ffprobe.
 const node = process.execPath;
@@ -85,5 +86,28 @@ describe('spawnFFmpeg', () => {
     });
 
     expect(percents).toEqual([50]);
+  });
+
+  it('reports enriched progress (fps, speed, bitrate, eta) from the stderr status line', async () => {
+    const updates: Progress[] = [];
+    await spawnFFmpeg({
+      binary: node,
+      args: [
+        '-e',
+        'process.stderr.write("fps= 30 time=00:00:05.00 bitrate= 800.0kbits/s speed=2.0x")',
+      ],
+      duration: 10,
+      onProgress: (p) => updates.push(p),
+    });
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0]).toMatchObject({
+      percent: 50,
+      currentTime: 5,
+      fps: 30,
+      speed: 2,
+      bitrate: 800000,
+      eta: 2.5,
+    });
   });
 });

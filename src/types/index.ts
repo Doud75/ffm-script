@@ -383,4 +383,15 @@ export interface Progress {
   currentTime: number;
   /** Total duration being processed, in seconds. */
   totalTime: number;
+  /** Encoding rate in frames per second, when FFmpeg reports it. */
+  fps?: number;
+  /** Encoding speed as a multiple of realtime (e.g. `1.5` = 1.5×), when reported. */
+  speed?: number;
+  /** Output bitrate in bits per second, when reported. */
+  bitrate?: number;
+  /**
+   * Estimated seconds remaining, derived from `speed` and the remaining
+   * duration. Present only when a positive `speed` is known.
+   */
+  eta?: number;
 }
