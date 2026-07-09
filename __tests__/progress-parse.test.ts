@@ -54,4 +54,11 @@ describe('parseProgress', () => {
     expect(p).not.toHaveProperty('eta');
     expect(p?.speed).toBe(0);
   });
+
+  it('omits a field whose captured value is not a finite number', () => {
+    // A malformed token still matches [\d.]+ but parses to NaN → dropped.
+    const p = parseProgress('time=00:00:01.00 fps=1.2.3', 10);
+    expect(p).not.toBeNull();
+    expect(p).not.toHaveProperty('fps');
+  });
 });

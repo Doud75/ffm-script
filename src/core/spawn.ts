@@ -264,9 +264,9 @@ export function parseProgress(text: string, duration: number): Progress | null {
   const time = TIME_RE.exec(text);
   if (time === null) return null;
 
+  // TIME_RE guarantees all four groups on a match, so they are never undefined.
   const [, hh, mm, ss, cs] = time;
-  const currentTime =
-    Number(hh ?? 0) * 3600 + Number(mm ?? 0) * 60 + Number(ss ?? 0) + Number(cs ?? 0) / 100;
+  const currentTime = Number(hh) * 3600 + Number(mm) * 60 + Number(ss) + Number(cs) / 100;
   const percent = Math.min(100, (currentTime / duration) * 100);
 
   const progress: Progress = { percent, currentTime, totalTime: duration };
