@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-07-11
+
+First stable release. The public API is now frozen under Semantic Versioning.
+
+### Changed
+
+- **BREAKING — `parallelConvert`:** the `targetBitrate` option is renamed **`videoBitrate`**,
+  aligning it with `convert`. Replace `targetBitrate` with `videoBitrate` in any
+  `parallelConvert` call — the behaviour (FFmpeg `-b:v`, mutually exclusive with `quality`)
+  is unchanged.
+- Type and error re-exports are now **explicit** rather than wildcard barrels, so the public
+  surface is an intentional, reviewed list. No observable API change — every previously
+  exported type and error class is still exported.
+
 ## [0.14.0] - 2026-07-09
 
 ### Added
@@ -137,6 +151,7 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
+[1.0.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.0.0
 [0.14.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.14.0
 [0.13.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.13.0
 [0.11.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.11.0

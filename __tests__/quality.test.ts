@@ -65,7 +65,7 @@ describe('quality presets (integration)', () => {
 
   it('parallelConvert rejects quality combined with a target bitrate', async () => {
     await expect(
-      parallelConvert(SAMPLE, join(dir, 'x.mp4'), { quality: 'high', targetBitrate: '2000k' }),
+      parallelConvert(SAMPLE, join(dir, 'x.mp4'), { quality: 'high', videoBitrate: '2000k' }),
     ).rejects.toBeInstanceOf(InvalidOptionsError);
   });
 

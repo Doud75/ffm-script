@@ -151,7 +151,7 @@ await convert('input.mp4', 'output.mp4', { quality: 'high' });
 | `balanced` | `-crf 23 -preset medium` | Sensible default trade-off      |
 | `small`    | `-crf 28 -preset medium` | Smaller files, lower quality    |
 
-`quality` is **constant-quality** encoding, so it's mutually exclusive with an explicit video bitrate (`videoBitrate` / `targetBitrate`, which target a _size_) — setting both throws `InvalidOptionsError`. Pick one.
+`quality` is **constant-quality** encoding, so it's mutually exclusive with an explicit video bitrate (`videoBitrate`, which targets a _size_) — setting both throws `InvalidOptionsError`. Pick one.
 
 ### Cut — `trim`
 
@@ -238,7 +238,7 @@ import { parallelConvert } from 'ffm-script';
 
 await parallelConvert('input.mp4', 'output.mp4', {
   workers: 4,
-  targetBitrate: '2000k',
+  videoBitrate: '2000k',
   width: 1280, // height auto-scaled to preserve aspect ratio
   onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`),
 });
@@ -274,7 +274,7 @@ const executor: SegmentExecutor = async (segment, ctx) => {
 await parallelConvert('input.mp4', 'output.mp4', {
   executor,
   concurrency: 16, // segments in flight — NOT capped to local cores when an executor is set
-  targetBitrate: '2000k',
+  videoBitrate: '2000k',
   retries: 2, // re-attempt a segment whose (remote) encode fails, before giving up
   retryDelay: 1000, // optional wait (ms) between attempts
 });
