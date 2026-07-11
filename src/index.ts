@@ -18,5 +18,37 @@ export { extractKeyframeIndex } from './core/mp4.js';
 export { resolveKeyframes } from './core/keyframes.js';
 export { planSegments } from './core/segments.js';
 export type { Segment, SegmentExecutor, SegmentExecutorContext } from './core/segments.js';
-export * from './types/index.js';
-export * from './errors/index.js';
+export type {
+  Stream,
+  VideoStream,
+  AudioStream,
+  ProbeResult,
+  Quality,
+  ConvertOptions,
+  TrimOptions,
+  ExtractAudioOptions,
+  ThumbnailOptions,
+  HLSResolution,
+  HLSOptions,
+  Keyframe,
+  ParallelConvertOptions,
+  OverlayPosition,
+  OverlayOptions,
+  AnimationOptions,
+  ExtractSubtitlesOptions,
+  BurnSubtitlesOptions,
+  ConcatOptions,
+  RunOptions,
+  RunStreamOptions,
+  SetMetadataOptions,
+  Progress,
+} from './types/index.js';
+export {
+  FfmScriptError,
+  FFmpegNotFoundError,
+  FileNotFoundError,
+  InvalidFormatError,
+  InvalidOptionsError,
+  FFmpegError,
+  FFmpegTimeoutError,
+} from './errors/index.js';

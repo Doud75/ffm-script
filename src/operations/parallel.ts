@@ -207,7 +207,7 @@ export async function parallelConvert(
       'parallelConvert cannot output WebM: its copy-based concat/mux pipeline produces h264/aac; use convert() for WebM',
     );
   }
-  assertQualityBitrateExclusive(options.quality, options.targetBitrate);
+  assertQualityBitrateExclusive(options.quality, options.videoBitrate);
 
   const localWorkers = resolveWorkers(options.workers, cpus().length);
   const concurrency =
@@ -267,7 +267,7 @@ export async function parallelConvert(
 function buildSegmentEncodeArgs(options: ParallelConvertOptions): string[] {
   const args = ['-an', '-c:v', 'libx264'];
   if (options.quality !== undefined) args.push(...qualityArgs(options.quality));
-  if (options.targetBitrate !== undefined) args.push('-b:v', options.targetBitrate);
+  if (options.videoBitrate !== undefined) args.push('-b:v', options.videoBitrate);
   const scale = buildScaleFilter(options.width, options.height);
   if (scale !== undefined) args.push('-vf', scale);
   return args;

@@ -84,7 +84,7 @@ parallelConvert(input: string, output: string, options?: {
   concurrency?: number   // segments in flight; only with a custom executor, NOT capped to core count
   retries?: number       // re-attempt a failed segment N times (default 0); never retries an abort
   retryDelay?: number    // ms to wait between retry attempts (default 0)
-  targetBitrate?: string // -b:v; mutually exclusive with quality
+  videoBitrate?: string  // -b:v; mutually exclusive with quality
   quality?: 'high' | 'balanced' | 'small'
   width?: number
   height?: number
@@ -356,7 +356,7 @@ await runStream(
 
 ## Gotchas to avoid
 
-- Don't set both `quality` and `videoBitrate`/`targetBitrate` → `InvalidOptionsError`.
+- Don't set both `quality` and `videoBitrate` → `InvalidOptionsError`.
 - Don't reach for `parallelConvert` expecting a faster local encode — on one machine it performs like `convert`; its value is the distributed chunked pipeline.
 - Don't send `.webm` to `parallelConvert` → use `convert`.
 - `trim`, `overlay`, `burnSubtitles`, `concat`, and the chain `.save()` require a **`.mp4`** output.

@@ -176,8 +176,8 @@ export interface ParallelConvertOptions {
    */
   workers?: number;
   /** Target video bitrate, e.g. `'2000k'` (FFmpeg `-b:v`). Mutually exclusive with `quality`. */
-  targetBitrate?: string;
-  /** Semantic quality preset (CRF + speed). Mutually exclusive with `targetBitrate`. */
+  videoBitrate?: string;
+  /** Semantic quality preset (CRF + speed). Mutually exclusive with `videoBitrate`. */
   quality?: Quality;
   /** Output width in pixels. If only one dimension is set, aspect ratio is preserved. */
   width?: number;

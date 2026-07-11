@@ -172,7 +172,7 @@ describe('parallelConvert', () => {
     const percents: number[] = [];
     await parallelConvert(SAMPLE, output, {
       workers: 4,
-      targetBitrate: '800k',
+      videoBitrate: '800k',
       onProgress: (p) => percents.push(p.percent),
     });
 
@@ -229,7 +229,7 @@ describe('parallelConvert', () => {
     ]);
 
     const output = join(dir, 'out-allintra.mp4');
-    await parallelConvert(allIntra, output, { workers: 4, targetBitrate: '800k' });
+    await parallelConvert(allIntra, output, { workers: 4, videoBitrate: '800k' });
 
     const info = await probe(output);
     expect(info.video?.codec).toBe('h264');
@@ -239,7 +239,7 @@ describe('parallelConvert', () => {
   it('keeps audio and video aligned at the junctions (no drift, no A/V offset)', async () => {
     const output = join(dir, 'out-continuity.mp4');
     // Many workers → many junctions: any drift or desync would accumulate here.
-    await parallelConvert(SAMPLE, output, { workers: 6, targetBitrate: '800k' });
+    await parallelConvert(SAMPLE, output, { workers: 6, videoBitrate: '800k' });
 
     const streams = (
       JSON.parse(
@@ -282,7 +282,7 @@ describe('parallelConvert', () => {
     ]);
 
     const output = join(dir, 'out-silent.mp4');
-    await parallelConvert(silent, output, { workers: 4, targetBitrate: '800k' });
+    await parallelConvert(silent, output, { workers: 4, videoBitrate: '800k' });
 
     const info = await probe(output);
     expect(info.video?.codec).toBe('h264');
@@ -295,7 +295,7 @@ describe('parallelConvert', () => {
     execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', SAMPLE, '-c', 'copy', mkv]);
 
     const output = join(dir, 'out-mkv.mp4');
-    await parallelConvert(mkv, output, { workers: 4, targetBitrate: '800k' });
+    await parallelConvert(mkv, output, { workers: 4, videoBitrate: '800k' });
 
     const info = await probe(output);
     expect(info.video?.codec).toBe('h264');
@@ -310,7 +310,7 @@ describe('parallelConvert', () => {
     // pipeline on a real run that still completes successfully.
     await parallelConvert(SAMPLE, output, {
       workers: 4,
-      targetBitrate: '800k',
+      videoBitrate: '800k',
       signal: controller.signal,
     });
 
@@ -365,7 +365,7 @@ describe('parallelConvert', () => {
     await parallelConvert(SAMPLE, output, {
       executor,
       concurrency: 3,
-      targetBitrate: '800k',
+      videoBitrate: '800k',
       signal: controller.signal,
     });
 
@@ -427,7 +427,7 @@ describe('parallelConvert', () => {
     await parallelConvert(SAMPLE, output, {
       executor,
       concurrency: 2, // → 2 segments
-      targetBitrate: '800k',
+      videoBitrate: '800k',
       retries: 1,
       retryDelay: 10, // exercises the inter-attempt wait
       signal: new AbortController().signal, // fresh signal → the wait is signal-aware but never fires
@@ -492,7 +492,7 @@ describe('parallelConvert', () => {
 
   it('writes an MKV output by stream-copying the h264/aac joins', async () => {
     const output = join(dir, 'out-container.mkv');
-    await parallelConvert(SAMPLE, output, { workers: 4, targetBitrate: '800k' });
+    await parallelConvert(SAMPLE, output, { workers: 4, videoBitrate: '800k' });
 
     const info = await probe(output);
     expect(info.video?.codec).toBe('h264');
@@ -502,7 +502,7 @@ describe('parallelConvert', () => {
 
   it('writes a MOV output', async () => {
     const output = join(dir, 'out-container.mov');
-    await parallelConvert(SAMPLE, output, { workers: 4, targetBitrate: '800k' });
+    await parallelConvert(SAMPLE, output, { workers: 4, videoBitrate: '800k' });
 
     const info = await probe(output);
     expect(info.video?.codec).toBe('h264');
