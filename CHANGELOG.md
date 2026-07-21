@@ -4,6 +4,12 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-21
+
+### Added
+
+- **`processBatch` — bounded-concurrency batch processing.** Runs an async task over many items (typically files) with at most `concurrency` in flight at once, resolving with each task's result **in input order**. Where `parallelConvert` parallelises the chunks of a single file, `processBatch` applies any operation across many files: `await processBatch(files, (f, i) => convert(f, outputs[i], { quality: 'balanced' }), { concurrency: 4, onProgress: (done, total) => … })`. The task is arbitrary, so it composes with every operation. **Fail-fast** — the first task to reject rejects the whole batch (like `Promise.all`); in-flight tasks aren't cancelled by the library. `concurrency` defaults to half the host's logical cores (at least 1) and `onProgress(done, total)` is a plain file counter (not the FFmpeg `Progress` object). New public type `BatchOptions`. The bounded pool that already backed `parallelConvert` now lives in a shared `core/pool.ts`.
+
 ## [1.1.0] - 2026-07-21
 
 ### Added
@@ -158,6 +164,7 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
+[1.2.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.0.0
 [0.14.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.14.0

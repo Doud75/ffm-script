@@ -7,6 +7,7 @@ import { spawnFFmpeg } from '../core/spawn.js';
 import { concatDemuxer } from '../core/concat.js';
 import { qualityArgs, assertQualityBitrateExclusive } from '../core/quality.js';
 import { buildScaleFilter } from '../core/scale.js';
+import { runPool, resolveConcurrency } from '../core/pool.js';
 import { resolveOutputContainer } from '../core/container.js';
 import { validateInput } from '../core/validate.js';
 import { resolveKeyframes } from '../core/keyframes.js';
@@ -44,22 +45,9 @@ export function resolveWorkers(requested: number | undefined, cpuCount: number):
   return Math.min(requested, cpuCount);
 }
 
-/**
- * Resolves the concurrency for a custom {@link SegmentExecutor}: how many segments
- * are encoded at once (and how finely the timeline is split). Unlike
- * {@link resolveWorkers} it is **not** capped to the local core count — remote
- * workers aren't bound by this machine's CPU. Falls back to `fallback` (the
- * core-based default) when omitted.
- *
- * @throws {InvalidOptionsError} when `requested` is not a positive integer.
- */
-export function resolveConcurrency(requested: number | undefined, fallback: number): number {
-  if (requested === undefined) return fallback;
-  if (!Number.isInteger(requested) || requested < 1) {
-    throw new InvalidOptionsError(`concurrency must be a positive integer (got ${requested})`);
-  }
-  return requested;
-}
+// Concurrency resolution lives in core/pool.ts (shared with processBatch); re-exported
+// here so it stays importable alongside the other parallelConvert option resolvers.
+export { resolveConcurrency };
 
 /**
  * Validates the retry count: how many times a failed segment is re-attempted
@@ -364,25 +352,6 @@ async function transcodeSegments(
   });
 
   return chunks;
-}
-
-/**
- * Runs `task` over `items` with at most `concurrency` in flight at once. Each lane
- * pulls the next item as soon as it is free, so longer tasks don't stall the rest.
- */
-async function runPool<T>(
-  items: T[],
-  concurrency: number,
-  task: (item: T) => Promise<void>,
-): Promise<void> {
-  let next = 0;
-  const lanes = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (next < items.length) {
-      const index = next++;
-      await task(items[index]!);
-    }
-  });
-  await Promise.all(lanes);
 }
 
 /** Encodes the whole audio track in a single pass (no junctions → no drift). */

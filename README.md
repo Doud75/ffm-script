@@ -309,6 +309,32 @@ Prefer the low-level pieces? `resolveKeyframes` and `planSegments` are also expo
 
 The output container follows the extension — `.mp4`, `.mov` or `.mkv`. WebM is rejected: chunks are re-encoded to h264 and stream-copied at the joins, which WebM can't carry — use [`convert`](#output-container) for WebM.
 
+### Batch many files — `processBatch`
+
+`parallelConvert` parallelises the chunks of **one** file. To run an operation across **many** files with a bounded number in flight at once, use `processBatch`:
+
+```ts
+import { processBatch, convert } from 'ffm-script';
+
+const files = ['a.mov', 'b.mov', 'c.mov'];
+
+await processBatch(files, (file, i) => convert(file, `out/${i}.mp4`, { quality: 'balanced' }), {
+  concurrency: 4, // at most 4 encodes running at a time
+  onProgress: (done, total) => console.log(`${done}/${total} done`),
+});
+```
+
+The task is any async function, so `processBatch` composes with every operation (or your own work). It resolves with **each task's result in input order**, whatever order they finish in:
+
+```ts
+const infos = await processBatch(files, (file) => probe(file));
+// infos[0] is probe(files[0]), infos[1] is probe(files[1]), …
+```
+
+- **`concurrency`** defaults to half the host's logical cores (at least 1) — the right default when each task is itself an FFmpeg process that already saturates the CPU. It isn't capped, so raise it for I/O-bound tasks.
+- **`onProgress(done, total)`** is a plain file counter (not the `Progress` object the FFmpeg operations report), fired after each task completes.
+- **Fail-fast:** the first task to reject rejects the whole batch (like `Promise.all`). Tasks already running aren't cancelled by the library — pass your own `signal` into the task if you need to stop them mid-flight. A `signal` on `processBatch` itself stops the pool from launching further tasks.
+
 ### Concatenate files — `concat`
 
 Join several videos into one MP4. FFmpeg has two concat mechanisms and the classic trap is picking the wrong one, so `concat` exposes both behind a familiar `fast` / `precise` choice — plus `auto`, which probes the inputs and decides for you:
