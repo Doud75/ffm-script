@@ -13,6 +13,7 @@ import animation from './animation.js';
 import metadata from './metadata.js';
 import concat from './concat.js';
 import hls from './hls.js';
+import audioHls from './audio-hls.js';
 import chain from './chain.js';
 import parallel from './parallel.js';
 import runRaw from './run-raw.js';
@@ -37,6 +38,7 @@ const examples: Example[] = [
   { name: 'metadata', run: metadata },
   { name: 'concat', run: concat },
   { name: 'hls', run: hls },
+  { name: 'audio-hls', run: audioHls },
   { name: 'chain', run: chain },
   { name: 'parallel', run: parallel },
   { name: 'run-raw', run: runRaw },

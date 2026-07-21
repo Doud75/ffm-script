@@ -1,26 +1,28 @@
 import { mkdir } from 'node:fs/promises';
-import { join } from 'node:path';
 import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
 import { validateInput } from '../core/validate.js';
-import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
+import { AUDIO_INPUT_FORMATS, VIDEO_INPUT_FORMATS } from '../core/formats.js';
+import { buildAudioHLSArgs, buildVideoHLSArgs } from '../core/hls.js';
 import { InvalidOptionsError } from '../errors/index.js';
-import type { HLSOptions, HLSResolution } from '../types/index.js';
+import type { AudioHLSOptions, HLSOptions, SegmentType } from '../types/index.js';
 import { probe } from './probe.js';
 
 const DEFAULT_SEGMENT_DURATION = 6;
-const AUDIO_BITRATE = '128k';
+const DEFAULT_SEGMENT_TYPE: SegmentType = 'ts';
+const DEFAULT_AUDIO_BITRATES = ['128k'];
 
 /**
  * Packages a video file into adaptive-bitrate HLS: one variant per requested
  * resolution plus a `master.m3u8` playlist, written under `outputDir`.
  *
  * Layout: `outputDir/master.m3u8` + one sub-folder per variant (named by its
- * width, or by `resolution.name`) containing `playlist.m3u8` and `.ts` segments.
+ * width, or by `resolution.name`) containing `playlist.m3u8` and its segments
+ * (`.ts` by default, or `.m4s` + an `init.mp4` when `segmentType` is `'fmp4'`).
  *
  * @param input - Path to the source video file (MP4/MOV/WebM/MKV).
  * @param outputDir - Directory to write the playlists and segments into (created if needed).
- * @param options - The resolution ladder, segment duration and progress/abort options.
+ * @param options - The resolution ladder, segment duration/type and progress/abort options.
  * @throws {FileNotFoundError} when `input` does not exist.
  * @throws {InvalidFormatError} when `input` is not a supported video format.
  * @throws {InvalidOptionsError} when `resolutions` is empty or a width is invalid.
@@ -41,6 +43,7 @@ export async function toHLS(input: string, outputDir: string, options: HLSOption
   }
 
   const segmentDuration = options.segmentDuration ?? DEFAULT_SEGMENT_DURATION;
+  const segmentType = options.segmentType ?? DEFAULT_SEGMENT_TYPE;
 
   // Probe once: gives the total duration (for progress) and whether audio exists.
   const info = await probe(input);
@@ -50,61 +53,58 @@ export async function toHLS(input: string, outputDir: string, options: HLSOption
 
   await spawnFFmpeg({
     binary: resolveBinary('ffmpeg'),
-    args: buildArgs(input, outputDir, resolutions, segmentDuration, hasAudio),
+    args: buildVideoHLSArgs(input, outputDir, resolutions, segmentDuration, hasAudio, segmentType),
     duration: info.duration,
     ...(options.onProgress !== undefined ? { onProgress: options.onProgress } : {}),
     ...(options.signal !== undefined ? { signal: options.signal } : {}),
   });
 }
 
-function buildArgs(
+/**
+ * Packages an audio file into adaptive-bitrate HLS: one AAC variant per
+ * requested bitrate plus a `master.m3u8` playlist, written under `outputDir`.
+ *
+ * The audio-only counterpart of {@link toHLS} — a bitrate ladder instead of a
+ * resolution ladder, no filtergraph. Layout: `outputDir/master.m3u8` + one
+ * sub-folder per variant (named by its bitrate, e.g. `128k/`) containing
+ * `playlist.m3u8` and its segments (`.ts` by default, or `.m4s` + an
+ * `init.mp4` when `segmentType` is `'fmp4'`). A `master.m3u8` is written even
+ * for a single bitrate.
+ *
+ * @param input - Path to the source audio file (MP3/AAC/WAV/FLAC/M4A).
+ * @param outputDir - Directory to write the playlists and segments into (created if needed).
+ * @param options - The bitrate ladder, segment duration/type and progress/abort options.
+ * @throws {FileNotFoundError} when `input` does not exist.
+ * @throws {InvalidFormatError} when `input` is not a supported audio format.
+ * @throws {InvalidOptionsError} when `bitrates` is empty.
+ * @throws {FFmpegNotFoundError} when `ffmpeg` cannot be located.
+ * @throws {FFmpegError} when `ffmpeg` exits with a non-zero code.
+ */
+export async function audioToHLS(
   input: string,
   outputDir: string,
-  resolutions: HLSResolution[],
-  segmentDuration: number,
-  hasAudio: boolean,
-): string[] {
-  // Split the source video into N streams and scale each to a target width.
-  const split = `[0:v]split=${resolutions.length}${resolutions.map((_, i) => `[v${i}]`).join('')}`;
-  const scales = resolutions.map((r, i) => `[v${i}]scale=w=${r.width}:h=-2[v${i}out]`);
-  const filterComplex = [split, ...scales].join('; ');
+  options: AudioHLSOptions = {},
+): Promise<void> {
+  await validateInput(input, AUDIO_INPUT_FORMATS);
 
-  const args = ['-i', input, '-filter_complex', filterComplex];
-
-  resolutions.forEach((r, i) => {
-    args.push('-map', `[v${i}out]`, `-c:v:${i}`, 'libx264', `-b:v:${i}`, r.bitrate);
-  });
-  if (hasAudio) {
-    resolutions.forEach((_, i) => {
-      args.push('-map', 'a:0', `-c:a:${i}`, 'aac', `-b:a:${i}`, AUDIO_BITRATE);
-    });
+  const bitrates = options.bitrates ?? DEFAULT_AUDIO_BITRATES;
+  if (bitrates.length === 0) {
+    throw new InvalidOptionsError('bitrates must contain at least one entry');
   }
 
-  const varStreamMap = resolutions
-    .map((r, i) => {
-      const name = r.name ?? String(r.width);
-      return hasAudio ? `v:${i},a:${i},name:${name}` : `v:${i},name:${name}`;
-    })
-    .join(' ');
+  const segmentDuration = options.segmentDuration ?? DEFAULT_SEGMENT_DURATION;
+  const segmentType = options.segmentType ?? DEFAULT_SEGMENT_TYPE;
 
-  args.push(
-    '-f',
-    'hls',
-    '-hls_time',
-    String(segmentDuration),
-    '-hls_playlist_type',
-    'vod',
-    '-hls_flags',
-    'independent_segments',
-    '-hls_segment_filename',
-    join(outputDir, '%v', 'segment_%03d.ts'),
-    '-master_pl_name',
-    'master.m3u8',
-    '-var_stream_map',
-    varStreamMap,
-    '-y',
-    join(outputDir, '%v', 'playlist.m3u8'),
-  );
+  // Probe once for the total duration (drives progress).
+  const info = await probe(input);
 
-  return args;
+  await mkdir(outputDir, { recursive: true });
+
+  await spawnFFmpeg({
+    binary: resolveBinary('ffmpeg'),
+    args: buildAudioHLSArgs(input, outputDir, bitrates, segmentDuration, segmentType),
+    duration: info.duration,
+    ...(options.onProgress !== undefined ? { onProgress: options.onProgress } : {}),
+    ...(options.signal !== undefined ? { signal: options.signal } : {}),
+  });
 }

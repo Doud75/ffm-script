@@ -1,6 +1,6 @@
 ---
 name: ffm-script
-description: Use when writing, reviewing, or debugging Node.js/TypeScript code that uses the "ffm-script" npm package (a dependency-free FFmpeg CLI wrapper). Provides exact public API signatures, format/output constraints, the typed error hierarchy, and copy-paste recipes for probe, convert, parallelConvert, trim, extractAudio, thumbnail, toHLS, overlay, subtitles, toAnimation, concat, setMetadata, run/runStream, and the chainable API. Use it instead of guessing signatures or option names.
+description: Use when writing, reviewing, or debugging Node.js/TypeScript code that uses the "ffm-script" npm package (a dependency-free FFmpeg CLI wrapper). Provides exact public API signatures, format/output constraints, the typed error hierarchy, and copy-paste recipes for probe, convert, parallelConvert, trim, extractAudio, thumbnail, toHLS, audioToHLS, overlay, subtitles, toAnimation, concat, setMetadata, run/runStream, and the chainable API. Use it instead of guessing signatures or option names.
 ---
 
 # ffm-script
@@ -196,11 +196,23 @@ Output `.gif` (per-clip generated palette) or `.webp` (animated WebP).
 toHLS(input: string, outputDir: string, options: {   // options REQUIRED
   resolutions: { width: number; bitrate: string; name?: string }[]  // the ABR ladder
   segmentDuration?: number   // seconds; default 6
+  segmentType?: 'ts' | 'fmp4'  // 'ts' MPEG-TS (default) | 'fmp4' CMAF (.m4s + init.mp4)
   onProgress?, signal?
 }): Promise<void>
 ```
 
-Writes `outputDir/master.m3u8` + one variant folder (playlist + `.ts`) per resolution.
+Writes `outputDir/master.m3u8` + one variant folder (playlist + segments) per resolution. Video input only.
+
+```ts
+audioToHLS(input: string, outputDir: string, options?: {   // options OPTIONAL
+  bitrates?: string[]        // AAC ABR ladder; default ['128k']
+  segmentDuration?: number   // seconds; default 6
+  segmentType?: 'ts' | 'fmp4'  // 'ts' MPEG-TS (default) | 'fmp4' CMAF (.m4s + init.mp4)
+  onProgress?, signal?
+}): Promise<void>
+```
+
+Audio-only counterpart of `toHLS` (bitrate ladder, no scaling). Audio input only (MP3/AAC/WAV/FLAC/M4A). Writes `outputDir/master.m3u8` + one folder per bitrate (named by the bitrate, e.g. `128k/`) — a master is written even for a single bitrate.
 
 ### Escape hatches
 
@@ -275,6 +287,7 @@ import {
   extractAudio,
   thumbnail,
   toHLS,
+  audioToHLS,
   overlay,
   burnSubtitles,
   toAnimation,
@@ -309,13 +322,16 @@ await extractAudio('in.mp4', 'out.mp3', { bitrate: '320k' });
 await thumbnail('in.mp4', 'thumb.jpg', { timestamp: 30, width: 640 });
 await toAnimation('in.mp4', 'clip.gif', { start: 3, end: 6, fps: 12, width: 480 });
 
-// HLS ladder
+// HLS ladder (video). segmentType: 'fmp4' for CMAF/.m4s + init.mp4
 await toHLS('in.mp4', './hls/', {
   resolutions: [
     { width: 1920, bitrate: '5000k' },
     { width: 1280, bitrate: '2500k' },
   ],
 });
+
+// HLS ladder (audio-only): bitrate ladder, master.m3u8 + one folder per bitrate
+await audioToHLS('podcast.m4a', './audio-hls/', { bitrates: ['128k', '64k'], segmentType: 'fmp4' });
 
 // Watermark, burn subtitles
 await overlay('in.mp4', 'out.mp4', {

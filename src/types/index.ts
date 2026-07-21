@@ -150,12 +150,42 @@ export interface HLSResolution {
   name?: string;
 }
 
+/** HLS segment container: `'ts'` (MPEG-TS) or `'fmp4'` (fragmented MP4 / CMAF). */
+export type SegmentType = 'ts' | 'fmp4';
+
 /** Options for {@link toHLS}. */
 export interface HLSOptions {
   /** One entry per quality variant (the adaptive-bitrate ladder). */
   resolutions: HLSResolution[];
   /** Segment length in seconds. Defaults to `6`. */
   segmentDuration?: number;
+  /**
+   * Segment container. `'ts'` (MPEG-TS, the default) or `'fmp4'` (fragmented
+   * MP4 / CMAF: `.m4s` segments plus an `init.mp4` per variant), for modern /
+   * low-latency HLS players.
+   */
+  segmentType?: SegmentType;
+  /** Called with progress updates as the packaging advances. */
+  onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+}
+
+/** Options for {@link audioToHLS}. */
+export interface AudioHLSOptions {
+  /**
+   * Audio-only ABR ladder: one AAC variant per entry, e.g. `['128k', '64k']`.
+   * Defaults to `['128k']`. The variant sub-folder is named after the bitrate.
+   */
+  bitrates?: string[];
+  /** Segment length in seconds. Defaults to `6`. */
+  segmentDuration?: number;
+  /**
+   * Segment container. `'ts'` (MPEG-TS, the default) or `'fmp4'` (fragmented
+   * MP4 / CMAF: `.m4s` segments plus an `init.mp4` per variant), for modern /
+   * low-latency HLS players.
+   */
+  segmentType?: SegmentType;
   /** Called with progress updates as the packaging advances. */
   onProgress?: (progress: Progress) => void;
   /** Aborts the operation; the returned promise rejects with an `AbortError`. */

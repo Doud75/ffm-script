@@ -7,7 +7,7 @@ import { extractAudio } from '../src/operations/extract.js';
 import { trim } from '../src/operations/trim.js';
 import { convert } from '../src/operations/convert.js';
 import { toAnimation } from '../src/operations/animation.js';
-import { toHLS } from '../src/operations/hls.js';
+import { toHLS, audioToHLS } from '../src/operations/hls.js';
 import { overlay } from '../src/operations/overlay.js';
 import { setMetadata } from '../src/operations/metadata.js';
 import { extractSubtitles, burnSubtitles } from '../src/operations/subtitles.js';
@@ -32,16 +32,24 @@ const isAbort = { name: 'AbortError' };
 let dir: string;
 let watermark: string;
 let subtitle: string;
+let audioStub: string;
+let audioReal: string;
 const out = (name: string): string => join(dir, name);
 
-beforeAll(() => {
+beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), 'ffm-opval-'));
   // validateInput only checks existence + extension, so empty stand-ins suffice.
   watermark = join(dir, 'wm.png');
   subtitle = join(dir, 'subs.srt');
+  audioStub = join(dir, 'a.m4a');
   writeFileSync(watermark, '');
   writeFileSync(subtitle, '');
-});
+  writeFileSync(audioStub, '');
+  // A real audio input, needed where `probe()` must succeed before the
+  // aborted-signal spawn is reached (audioToHLS threading test).
+  audioReal = join(dir, 'real.m4a');
+  await extractAudio(SAMPLE, audioReal, { codec: 'aac' });
+}, 60_000);
 
 afterAll(() => {
   rmSync(dir, { recursive: true, force: true });
@@ -165,6 +173,37 @@ describe('toHLS validation', () => {
     await expect(
       toHLS(SAMPLE, out('hls'), {
         resolutions: [{ width: 320, bitrate: '500k' }],
+        onProgress: noop,
+        signal: aborted(),
+      }),
+    ).rejects.toMatchObject(isAbort);
+  });
+
+  it('rejects an audio input (video-only)', async () => {
+    await expect(
+      toHLS(audioStub, out('hls-audio-in'), { resolutions: [{ width: 320, bitrate: '500k' }] }),
+    ).rejects.toBeInstanceOf(InvalidFormatError);
+  });
+});
+
+describe('audioToHLS validation', () => {
+  it('rejects an empty bitrate ladder', async () => {
+    await expect(audioToHLS(audioStub, out('ahls-bad'), { bitrates: [] })).rejects.toBeInstanceOf(
+      InvalidOptionsError,
+    );
+  });
+
+  it('rejects a video input (audio-only)', async () => {
+    await expect(audioToHLS(SAMPLE, out('ahls-video-in'))).rejects.toBeInstanceOf(
+      InvalidFormatError,
+    );
+  });
+
+  it('probes, creates the dir, and threads progress/signal', async () => {
+    await expect(
+      audioToHLS(audioReal, out('ahls'), {
+        bitrates: ['128k', '64k'],
+        segmentType: 'fmp4',
         onProgress: noop,
         signal: aborted(),
       }),

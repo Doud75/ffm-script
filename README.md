@@ -205,6 +205,25 @@ await toHLS('input.mp4', './output/', {
 // → output/master.m3u8 + output/1920/ + output/1280/ + output/854/
 ```
 
+Pass `segmentType: 'fmp4'` for fragmented-MP4 / CMAF segments (`.m4s` + a per-variant init MP4) instead of the default MPEG-TS `.ts` — for modern and low-latency HLS players.
+
+### Package audio as HLS — `audioToHLS`
+
+The audio-only counterpart of `toHLS`: an AAC **bitrate** ladder (no scaling) for streaming sound — radio, podcasts. Accepts MP3/AAC/WAV/FLAC/M4A input.
+
+```ts
+import { audioToHLS } from 'ffm-script';
+
+await audioToHLS('podcast.wav', './output/', {
+  bitrates: ['128k', '64k'], // default: ['128k']
+  segmentType: 'fmp4', // 'ts' (default) | 'fmp4'
+  segmentDuration: 6,
+});
+// → output/master.m3u8 + output/128k/ + output/64k/
+```
+
+A `master.m3u8` is written even for a single bitrate, so players always target the same URL. Each variant folder is named after its bitrate.
+
 ### Chainable API — `ffmscript`
 
 Fuse `trim` and `convert` into a **single** FFmpeg pass (not separate processes):
