@@ -1,6 +1,6 @@
 {
   "name": "ffm-script",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Modern, dependency-free TypeScript wrapper around the FFmpeg CLI: probe, transcode (MP4/MOV/MKV/WebM), trim, extract audio, thumbnails, HLS packaging, watermarks, subtitles, animated GIF/WebP, multi-file concat, and keyframe-aware parallel transcoding.",
   "keywords": [
     "ffmpeg",
