@@ -1,0 +1,44 @@
+# Codecov configuration. Silences the "No config file could be found" warning
+# and makes the PR comment / status behaviour explicit rather than relying on
+# Codecov's shifting defaults. See https://docs.codecov.com/docs/codecovyml-reference
+
+codecov:
+  # Post the report even if some CI jobs are still running / failed — coverage is
+  # informational here, not a merge gate. This is the key fix for the "Missing base
+  # report" error: Codecov otherwise only treats a commit's coverage as a valid PR
+  # base once it recognises the commit's CI as passed. Since the Harness migration
+  # it no longer reliably reads the GitHub Actions check conclusions, so main-branch
+  # base commits were being marked invalid → no comparison → no PR comment.
+  require_ci_to_pass: false
+  # Let Codecov fall back to a parent commit (a "pseudo-base") when the exact base
+  # has no coverage — e.g. a merge or version-bump commit. Default is true; set
+  # explicitly so base resolution stays forgiving.
+  allow_pseudo_compare: true
+
+coverage:
+  status:
+    project:
+      default:
+        # Compare against the base commit; allow a small dip without failing.
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        # New/changed lines in a PR should be well covered (the repo already
+        # runs at ~97% statements / ~91% branches).
+        target: 90%
+
+# The PR comment `codecov-commenter` posts.
+comment:
+  layout: 'reach, diff, flags, files'
+  behavior: default
+  require_changes: false
+
+# Only src/ is measured; keep everything else out of the report.
+ignore:
+  - '__tests__'
+  - 'examples'
+  - 'fixtures'
+  - 'dist'
+  - '**/*.config.ts'
+  - '**/*.config.js'

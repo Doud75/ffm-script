@@ -57,6 +57,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          # Full history so Codecov can resolve the PR's base commit. A shallow
+          # clone (the default depth 1) sends truncated git metadata, and Codecov
+          # then reports "Missing Base Commit" → no diff, no PR comment.
+          fetch-depth: 0
 
       - name: Enable corepack
         run: corepack enable
