@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - unreleased
+## [1.1.0] - 2026-07-21
 
 ### Added
 
@@ -158,6 +158,7 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
+[1.1.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.0.0
 [0.14.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.14.0
 [0.13.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.13.0
