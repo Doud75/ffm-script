@@ -14,6 +14,7 @@ export { toHLS, audioToHLS } from './operations/hls.js';
 export { ffmscript, FfmScriptChain } from './operations/chain.js';
 export type { SaveOptions } from './operations/chain.js';
 export { parallelConvert } from './operations/parallel.js';
+export { processBatch } from './operations/batch.js';
 export { extractKeyframeIndex } from './core/mp4.js';
 export { resolveKeyframes } from './core/keyframes.js';
 export { planSegments } from './core/segments.js';
@@ -34,6 +35,7 @@ export type {
   SegmentType,
   Keyframe,
   ParallelConvertOptions,
+  BatchOptions,
   OverlayPosition,
   OverlayOptions,
   AnimationOptions,

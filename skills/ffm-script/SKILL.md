@@ -249,6 +249,22 @@ ffmscript(input: string)
 
 Fuses `trim` + `convert` into a **single** FFmpeg pass. Order-independent. Output must be `.mp4`. `.save()` throws `InvalidOptionsError` if no operation was queued. `.raw()` flags are appended after generated ones, so explicit flags win (a `-vf` overrides the scale from `.convert({ width })`).
 
+### Batch
+
+```ts
+processBatch<T, R>(
+  items: T[],
+  task: (item: T, index: number) => Promise<R>,
+  options?: {
+    concurrency?: number   // tasks in flight; default half the host's logical cores (>=1), uncapped
+    onProgress?: (done: number, total: number) => void   // NOT the Progress object — a file counter
+    signal?: AbortSignal
+  }
+): Promise<R[]>            // results in input order
+```
+
+Runs `task` over many items with a bounded pool (the same engine `parallelConvert` uses per chunk), returning each result at its input index. **Fail-fast:** the first task to reject rejects the whole batch (like `Promise.all`); in-flight tasks aren't cancelled by the lib — wire your own `signal` into `task` for that. `task` is arbitrary, so it composes with any operation. Empty `items` → `[]`. Throws `InvalidOptionsError` for a non-positive-integer `concurrency`.
+
 ### Building blocks (advanced)
 
 `extractKeyframeIndex(file)`, `resolveKeyframes(file)`, `planSegments(keyframes, { segmentCount })` — the internals behind `parallelConvert`, plus the `Keyframe` / `Segment` types. To distribute the chunked pipeline, prefer the `executor` option on `parallelConvert` (it reuses the built-in audio pass + join); these primitives are the lower-level path if you want to plan the split and join (`concat({ mode: 'fast' })`) entirely yourself.
@@ -283,6 +299,7 @@ import {
   probe,
   convert,
   parallelConvert,
+  processBatch,
   trim,
   extractAudio,
   thumbnail,
@@ -310,6 +327,12 @@ await parallelConvert('movie.mkv', 'out.mp4', { workers: 4, quality: 'balanced' 
 
 // Transcode to WebM (use convert, NOT parallelConvert)
 await convert('in.mp4', 'out.webm'); // VP9 + Opus by default
+
+// Batch: transcode many files with a bounded pool (fail-fast, results in input order)
+await processBatch(files, (f, i) => convert(f, outputs[i], { quality: 'balanced' }), {
+  concurrency: 4,
+  onProgress: (done, total) => console.log(`${done}/${total}`),
+});
 
 // Precise cut
 await trim('in.mp4', 'cut.mp4', { start: '00:01:00', end: '00:03:00', mode: 'precise' });

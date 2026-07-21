@@ -16,6 +16,7 @@ import hls from './hls.js';
 import audioHls from './audio-hls.js';
 import chain from './chain.js';
 import parallel from './parallel.js';
+import batch from './batch.js';
 import runRaw from './run-raw.js';
 import runStream from './run-stream.js';
 
@@ -41,6 +42,7 @@ const examples: Example[] = [
   { name: 'audio-hls', run: audioHls },
   { name: 'chain', run: chain },
   { name: 'parallel', run: parallel },
+  { name: 'batch', run: batch },
   { name: 'run-raw', run: runRaw },
   { name: 'run-stream', run: runStream },
 ];

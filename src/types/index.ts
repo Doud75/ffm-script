@@ -249,6 +249,28 @@ export interface ParallelConvertOptions {
   signal?: AbortSignal;
 }
 
+/** Options for {@link processBatch}. */
+export interface BatchOptions {
+  /**
+   * How many tasks run at once. Defaults to half the host's logical cores (at
+   * least 1) — the sensible default when each task is itself an FFmpeg process
+   * that already saturates the CPU. Not capped, so raise it for I/O-bound tasks.
+   */
+  concurrency?: number;
+  /**
+   * Called after each task finishes, with the number of completed tasks and the
+   * total. A plain `(done, total)` counter — not the FFmpeg `Progress` object —
+   * since a batch tracks *files done*, not a single timeline.
+   */
+  onProgress?: (done: number, total: number) => void;
+  /**
+   * Stops the pool from starting further tasks; the returned promise rejects with
+   * an `AbortError`. Tasks already running are not cancelled — wire this same
+   * signal into your `task` if you need to stop them mid-flight.
+   */
+  signal?: AbortSignal;
+}
+
 /** Where a watermark is anchored within the frame. */
 export type OverlayPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
 
