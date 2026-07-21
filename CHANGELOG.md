@@ -4,6 +4,13 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-07-21
+
+### Added
+
+- **`audioToHLS` — audio-only HLS packaging.** The audio counterpart of `toHLS`: an AAC **bitrate** ladder (`bitrates`, default `['128k']`) instead of a resolution ladder, with no filtergraph or scaling — for streaming sound (radio, podcasts), which `toHLS` (video-only) could not do. Accepts MP3/AAC/WAV/FLAC/M4A input and writes `outputDir/master.m3u8` plus one folder per bitrate (named by the bitrate, e.g. `128k/`); a `master.m3u8` is written even for a single bitrate, so players always target the same URL. Supports the same `segmentDuration`/`onProgress`/`signal` options. New public type `AudioHLSOptions`.
+- **`segmentType: 'ts' | 'fmp4'` on `toHLS` and `audioToHLS`.** Selects the segment container: `'ts'` (MPEG-TS, the default — strictly backward-compatible) or `'fmp4'` (fragmented MP4 / CMAF: `.m4s` segments plus a per-variant init MP4), for modern and low-latency HLS players. New public type `SegmentType`. Purely additive — existing `toHLS` calls are unchanged.
+
 ## [1.0.0] - 2026-07-11
 
 First stable release. The public API is now frozen under Semantic Versioning.
@@ -151,6 +158,7 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
+[1.1.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.0.0
 [0.14.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.14.0
 [0.13.0]: https://github.com/Doud75/ffm-script/releases/tag/v0.13.0

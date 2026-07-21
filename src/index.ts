@@ -10,7 +10,7 @@ export { toAnimation } from './operations/animation.js';
 export { setMetadata } from './operations/metadata.js';
 export { run, runStream } from './operations/run.js';
 export { concat } from './operations/concat.js';
-export { toHLS } from './operations/hls.js';
+export { toHLS, audioToHLS } from './operations/hls.js';
 export { ffmscript, FfmScriptChain } from './operations/chain.js';
 export type { SaveOptions } from './operations/chain.js';
 export { parallelConvert } from './operations/parallel.js';
@@ -30,6 +30,8 @@ export type {
   ThumbnailOptions,
   HLSResolution,
   HLSOptions,
+  AudioHLSOptions,
+  SegmentType,
   Keyframe,
   ParallelConvertOptions,
   OverlayPosition,
