@@ -6,6 +6,7 @@ import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
 import { parseTimestamp } from '../core/time.js';
 import { buildScaleFilter } from '../core/scale.js';
 import { qualityArgs, assertQualityBitrateExclusive } from '../core/quality.js';
+import { buildHwaccelArgs } from '../core/hwaccel.js';
 import { InvalidFormatError, InvalidOptionsError } from '../errors/index.js';
 import type { ConvertOptions, Progress, TrimOptions } from '../types/index.js';
 import { probe } from './probe.js';
@@ -67,7 +68,7 @@ export class FfmScriptChain {
    *
    * @throws {FileNotFoundError} when the input does not exist.
    * @throws {InvalidFormatError} when the input is not a supported video format or `output` is not `.mp4`.
-   * @throws {InvalidOptionsError} when no operation was queued or a timestamp/range is invalid.
+   * @throws {InvalidOptionsError} when no operation was queued, a timestamp/range is invalid, or `quality` is combined with a bitrate or with an encoder that has no known preset scale.
    */
   async save(output: string, options: SaveOptions = {}): Promise<void> {
     await validateInput(this.#input, VIDEO_INPUT_FORMATS);
@@ -101,7 +102,8 @@ export class FfmScriptChain {
       (this.#trim?.mode ?? 'fast') === 'precise' ||
       this.#raw !== undefined;
 
-    const args: string[] = [];
+    // Input options, in FFmpeg's expected order: they all apply to the -i that follows.
+    const args: string[] = buildHwaccelArgs(this.#convert?.hwaccel);
     if (start !== undefined) args.push('-ss', String(start));
     args.push('-i', this.#input);
     if (trimDuration !== undefined) args.push('-t', String(trimDuration));
@@ -110,8 +112,11 @@ export class FfmScriptChain {
     if (scale !== undefined) args.push('-vf', scale);
 
     if (reencode) {
-      args.push('-c:v', this.#convert?.videoCodec ?? DEFAULT_VIDEO_CODEC);
-      if (this.#convert?.quality !== undefined) args.push(...qualityArgs(this.#convert.quality));
+      const videoCodec = this.#convert?.videoCodec ?? DEFAULT_VIDEO_CODEC;
+      args.push('-c:v', videoCodec);
+      if (this.#convert?.quality !== undefined) {
+        args.push(...qualityArgs(this.#convert.quality, videoCodec));
+      }
       if (this.#convert?.videoBitrate !== undefined) args.push('-b:v', this.#convert.videoBitrate);
       args.push('-c:a', this.#convert?.audioCodec ?? DEFAULT_AUDIO_CODEC);
       if (this.#convert?.audioBitrate !== undefined) args.push('-b:a', this.#convert.audioBitrate);

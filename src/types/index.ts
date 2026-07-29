@@ -91,6 +91,18 @@ export interface ConvertOptions {
   width?: number;
   /** Output height in pixels. If only one dimension is set, aspect ratio is preserved. */
   height?: number;
+  /**
+   * Hardware decoder for the input (FFmpeg `-hwaccel`), e.g. `'cuda'`,
+   * `'videotoolbox'`, `'qsv'`, `'vaapi'`, or `'none'` to force software decoding.
+   * Omitted → software decoding. Call {@link listHwaccels} to see what this
+   * FFmpeg build supports; the value is passed through untouched, so an
+   * unavailable method surfaces as an `FFmpegError`.
+   *
+   * This accelerates **decoding** only: frames come back to system memory, which
+   * is what keeps it composable with `width`/`height`. To accelerate the encode
+   * too, pair it with a hardware `videoCodec` (e.g. `'h264_nvenc'`).
+   */
+  hwaccel?: string;
   /** Called with progress updates as the transcode advances. */
   onProgress?: (progress: Progress) => void;
   /** Aborts the operation; the returned promise rejects with an `AbortError`. */
@@ -209,6 +221,20 @@ export interface ParallelConvertOptions {
   videoBitrate?: string;
   /** Semantic quality preset (CRF + speed). Mutually exclusive with `videoBitrate`. */
   quality?: Quality;
+  /**
+   * Encoder for the chunks (FFmpeg `-c:v`). Defaults to `'libx264'`. Must be a
+   * codec the output container accepts — the chunks are joined and muxed with a
+   * stream copy, so whatever comes out of the encode has to be muxable as-is.
+   * Every chunk is encoded with the same flags, so a hardware encoder
+   * (`'h264_nvenc'`, `'hevc_qsv'`, …) still joins seamlessly.
+   */
+  videoCodec?: string;
+  /**
+   * Hardware decoder applied to every chunk read (FFmpeg `-hwaccel`), e.g.
+   * `'cuda'` or `'videotoolbox'`. See {@link ConvertOptions.hwaccel}; with a
+   * custom `executor` it is handed over as `inputArgs` rather than used locally.
+   */
+  hwaccel?: string;
   /** Output width in pixels. If only one dimension is set, aspect ratio is preserved. */
   width?: number;
   /** Output height in pixels. If only one dimension is set, aspect ratio is preserved. */

@@ -90,10 +90,12 @@ describe('convert', () => {
     ).rejects.toBeInstanceOf(InvalidFormatError);
   });
 
-  it('throws InvalidOptionsError when a quality preset is used with a non-CRF codec', async () => {
-    await expect(convert(input, join(dir, 'q.webm'), { quality: 'high' })).rejects.toBeInstanceOf(
-      InvalidOptionsError,
-    );
+  it('throws InvalidOptionsError when a quality preset has no scale for the encoder', async () => {
+    // Presets are calibrated per encoder family; an encoder outside every known
+    // family has no equivalent dial, so the caller is sent to videoBitrate.
+    await expect(
+      convert(input, join(dir, 'q.mp4'), { quality: 'high', videoCodec: 'mpeg4' }),
+    ).rejects.toBeInstanceOf(InvalidOptionsError);
   });
 
   it('rejects with an AbortError when the signal is aborted', async () => {

@@ -4,13 +4,12 @@ import { validateInput } from '../core/validate.js';
 import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
 import { buildScaleFilter } from '../core/scale.js';
 import { qualityArgs, assertQualityBitrateExclusive } from '../core/quality.js';
+import { buildHwaccelArgs } from '../core/hwaccel.js';
 import {
   resolveOutputContainer,
   assertCodecAllowed,
-  isCrfFamily,
   type ContainerConfig,
 } from '../core/container.js';
-import { InvalidOptionsError } from '../errors/index.js';
 import type { ConvertOptions } from '../types/index.js';
 import { probe } from './probe.js';
 
@@ -24,12 +23,17 @@ import { probe } from './probe.js';
  * provided, the input is probed first to derive its duration so progress can be
  * reported as a percentage.
  *
+ * Set `hwaccel` to decode the input on the GPU, and pair it with a hardware
+ * encoder (`videoCodec: 'h264_nvenc'`, `'h264_videotoolbox'`, …) to move the
+ * encode there too — `quality` presets are calibrated per encoder family, so the
+ * same `quality: 'balanced'` works across them.
+ *
  * @param input - Path to the source video file.
  * @param output - Path to the destination file; its extension picks the container.
- * @param options - Codec, bitrate, resolution and progress options.
+ * @param options - Codec, bitrate, resolution, hardware acceleration and progress options.
  * @throws {FileNotFoundError} when `input` does not exist.
  * @throws {InvalidFormatError} when `input` is not a supported video format, the output extension matches no container, or a chosen codec is incompatible with it.
- * @throws {InvalidOptionsError} when `quality` is combined with a bitrate or a non-CRF codec.
+ * @throws {InvalidOptionsError} when `quality` is combined with a bitrate or with an encoder that has no known preset scale.
  * @throws {FFmpegNotFoundError} when `ffmpeg` cannot be located.
  * @throws {FFmpegError} when `ffmpeg` exits with a non-zero code.
  */
@@ -47,17 +51,14 @@ export async function convert(
   assertCodecAllowed(config, audioCodec, 'audio', output);
 
   assertQualityBitrateExclusive(options.quality, options.videoBitrate);
-  if (options.quality !== undefined && !isCrfFamily(videoCodec)) {
-    throw new InvalidOptionsError(
-      `quality presets target the x264/x265 CRF scale and don't apply to "${videoCodec}"; use videoBitrate instead`,
-    );
-  }
 
+  // Built before the probe below so an invalid option fails without spawning anything.
+  const args = buildArgs(input, output, options, config, videoCodec, audioCodec);
   const duration = options.onProgress !== undefined ? (await probe(input)).duration : undefined;
 
   await spawnFFmpeg({
     binary: resolveBinary('ffmpeg'),
-    args: buildArgs(input, output, options, config, videoCodec, audioCodec),
+    args,
     ...(duration !== undefined ? { duration } : {}),
     ...(options.onProgress !== undefined ? { onProgress: options.onProgress } : {}),
     ...(options.signal !== undefined ? { signal: options.signal } : {}),
@@ -72,7 +73,8 @@ function buildArgs(
   videoCodec: string,
   audioCodec: string,
 ): string[] {
-  const args = ['-i', input];
+  // Hardware decoding is an *input* option: it applies to the file that follows.
+  const args = [...buildHwaccelArgs(options.hwaccel), '-i', input];
 
   args.push('-c:v', videoCodec);
   // Codec-specific defaults (e.g. VP9 speed flags) only apply when the caller
@@ -82,7 +84,7 @@ function buildArgs(
   }
   args.push('-c:a', audioCodec);
 
-  if (options.quality !== undefined) args.push(...qualityArgs(options.quality));
+  if (options.quality !== undefined) args.push(...qualityArgs(options.quality, videoCodec));
   if (options.videoBitrate !== undefined) args.push('-b:v', options.videoBitrate);
   if (options.audioBitrate !== undefined) args.push('-b:a', options.audioBitrate);
 

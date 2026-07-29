@@ -86,9 +86,6 @@ const ENCODER_TO_CODEC: Record<string, string> = {
   ac3: 'ac3',
 };
 
-/** x264/x265-family encoders — the only ones the CRF `quality` presets fit. */
-const CRF_FAMILY = new Set(['libx264', 'h264', 'libx265', 'hevc', 'h265', 'libx264rgb']);
-
 /**
  * Resolves the output container from a file path's extension.
  *
@@ -138,9 +135,4 @@ export function assertCodecAllowed(
       `${kind} codec "${codec}" is not valid in this container (accepts: ${allowed.join(', ')})`,
     );
   }
-}
-
-/** Whether `encoder` belongs to the x264/x265 family the `quality` presets target. */
-export function isCrfFamily(encoder: string): boolean {
-  return CRF_FAMILY.has(encoder);
 }

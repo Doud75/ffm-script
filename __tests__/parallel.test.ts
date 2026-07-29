@@ -332,6 +332,7 @@ describe('parallelConvert', () => {
       index: number;
       duration: number;
       hasSignal: boolean;
+      inputArgs: string[];
       encodeArgs: string[];
     }[] = [];
     const controller = new AbortController();
@@ -344,12 +345,14 @@ describe('parallelConvert', () => {
         index: segment.index,
         duration: ctx.duration,
         hasSignal: ctx.signal !== undefined,
+        inputArgs: ctx.inputArgs,
         encodeArgs: ctx.encodeArgs,
       });
       const chunk = join(dir, `exec_chunk_${String(segment.index)}.mp4`);
       execFileSync('ffmpeg', [
         '-loglevel',
         'error',
+        ...ctx.inputArgs,
         '-ss',
         String(segment.startTime),
         '-i',
@@ -378,6 +381,7 @@ describe('parallelConvert', () => {
       expect(c.encodeArgs).toEqual(
         expect.arrayContaining(['-an', '-c:v', 'libx264', '-b:v', '800k']),
       );
+      expect(c.inputArgs).toEqual([]); // no hwaccel requested
       expect(c.duration).toBeGreaterThan(0);
       expect(c.hasSignal).toBe(true); // the abort signal reaches the executor
     }
@@ -389,6 +393,47 @@ describe('parallelConvert', () => {
     expect(info.audio?.codec).toBe('aac');
     expect(info.duration).toBeCloseTo(10, 0);
   }, 60_000);
+
+  it('hands the chosen encoder and decode method to the executor', async () => {
+    const calls: { inputArgs: string[]; encodeArgs: string[] }[] = [];
+    // Never actually encodes — the contract handed to the executor is what's under
+    // test, and asserting it needs no GPU. The rejection ends the run right after.
+    const executor: SegmentExecutor = (_segment, ctx) => {
+      calls.push({ inputArgs: ctx.inputArgs, encodeArgs: ctx.encodeArgs });
+      return Promise.reject(new Error('stop here'));
+    };
+
+    await expect(
+      parallelConvert(SAMPLE, join(dir, 'x.mp4'), {
+        executor,
+        concurrency: 2,
+        videoCodec: 'h264_nvenc',
+        hwaccel: 'cuda',
+        quality: 'balanced',
+      }),
+    ).rejects.toThrow('stop here');
+
+    expect(calls.length).toBeGreaterThan(0);
+    for (const c of calls) {
+      // Hardware decode is an input option, so it must reach the worker separately
+      // from the encode flags — a worker splices it in before its own -i.
+      expect(c.inputArgs).toEqual(['-hwaccel', 'cuda']);
+      // The encoder is the caller's, and 'balanced' came out in nvenc's dialect
+      // rather than x264's -crf.
+      expect(c.encodeArgs).toEqual(
+        expect.arrayContaining(['-c:v', 'h264_nvenc', '-cq', '23', '-preset', 'p4']),
+      );
+      expect(c.encodeArgs).not.toContain('-crf');
+    }
+  }, 30_000);
+
+  it('rejects an encoder the output container cannot carry', async () => {
+    // The chunks are joined and muxed with a stream copy, so whatever the encode
+    // produces has to be muxable as-is — checked before any work starts.
+    await expect(
+      parallelConvert(SAMPLE, join(dir, 'x.mp4'), { videoCodec: 'libvpx-vp9' }),
+    ).rejects.toBeInstanceOf(InvalidFormatError);
+  });
 
   it('propagates an executor failure (and still cleans up)', async () => {
     const boom = new Error('remote worker exploded');
