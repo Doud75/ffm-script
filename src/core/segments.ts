@@ -15,11 +15,17 @@ export interface SegmentExecutorContext {
   /** Source video to encode this segment from (the input passed to `parallelConvert`). */
   input: string;
   /**
+   * FFmpeg flags that must come **before** the `-i` because they configure how the
+   * input is read — currently the hardware decoder (`['-hwaccel', 'cuda']`), empty
+   * when none was requested. Same for every segment.
+   */
+  inputArgs: string[];
+  /**
    * Shared FFmpeg video-encode flags for the chunk, *without* input, seek or
    * output — e.g. `['-an', '-c:v', 'libx264', '-b:v', '2000k', '-vf', 'scale=1280:-2']`.
    * Every segment gets the **same** flags, so all chunks share one encoding and the
    * joins can be stream-copied. A worker wraps them into a full command:
-   * `ffmpeg -ss <segment.startTime> -i <input> [-t <duration>] <encodeArgs> -y <chunk>`
+   * `ffmpeg <inputArgs> -ss <segment.startTime> -i <input> [-t <duration>] <encodeArgs> -y <chunk>`
    * — add `-t` only when `segment.endTime` is defined (the last segment runs to EOF).
    */
   encodeArgs: string[];
@@ -35,8 +41,8 @@ export interface SegmentExecutorContext {
 }
 
 /**
- * Encodes one segment and resolves with the path to the produced chunk. The chunk
- * must be h264 with the same parameters as every other chunk (see
+ * Encodes one segment and resolves with the path to the produced chunk. Every
+ * chunk must come out with the same codec and parameters as the others (see
  * {@link SegmentExecutorContext.encodeArgs}) so `parallelConvert` can join them
  * with a stream copy, and the returned path must be readable by the machine
  * running `parallelConvert` when the join happens.

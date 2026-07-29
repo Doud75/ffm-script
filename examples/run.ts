@@ -17,6 +17,7 @@ import audioHls from './audio-hls.js';
 import chain from './chain.js';
 import parallel from './parallel.js';
 import batch from './batch.js';
+import hwaccel from './hwaccel.js';
 import runRaw from './run-raw.js';
 import runStream from './run-stream.js';
 
@@ -43,6 +44,7 @@ const examples: Example[] = [
   { name: 'chain', run: chain },
   { name: 'parallel', run: parallel },
   { name: 'batch', run: batch },
+  { name: 'hwaccel', run: hwaccel },
   { name: 'run-raw', run: runRaw },
   { name: 'run-stream', run: runStream },
 ];

@@ -1,4 +1,4 @@
-import { resolveOutputContainer, assertCodecAllowed, isCrfFamily } from '../src/core/container.js';
+import { resolveOutputContainer, assertCodecAllowed } from '../src/core/container.js';
 import { InvalidFormatError } from '../src/errors/index.js';
 
 describe('resolveOutputContainer', () => {
@@ -51,14 +51,5 @@ describe('assertCodecAllowed', () => {
     expect(() => assertCodecAllowed(mkv, 'libvpx-vp9', 'video', 'o.mkv')).not.toThrow();
     expect(() => assertCodecAllowed(mkv, 'libx264', 'video', 'o.mkv')).not.toThrow();
     expect(() => assertCodecAllowed(mkv, 'flac', 'audio', 'o.mkv')).not.toThrow();
-  });
-});
-
-describe('isCrfFamily', () => {
-  it('is true for x264/x265 encoders only', () => {
-    expect(isCrfFamily('libx264')).toBe(true);
-    expect(isCrfFamily('libx265')).toBe(true);
-    expect(isCrfFamily('libvpx-vp9')).toBe(false);
-    expect(isCrfFamily('libopus')).toBe(false);
   });
 });

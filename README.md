@@ -139,19 +139,62 @@ An explicit codec the container can't carry (e.g. `videoCodec: 'libx264'` with `
 
 #### Quality presets
 
-`convert`, `parallelConvert` and the chainable `.convert(...)` accept a semantic `quality` preset instead of fiddling with bitrates. Each maps to a libx264 CRF (the quality/size dial) and speed preset:
+`convert`, `parallelConvert` and the chainable `.convert(...)` accept a semantic `quality` preset instead of fiddling with bitrates:
 
 ```ts
 await convert('input.mp4', 'output.mp4', { quality: 'high' });
 ```
 
-| Preset     | FFmpeg                   | Use it for                      |
-| ---------- | ------------------------ | ------------------------------- |
-| `high`     | `-crf 18 -preset slow`   | Visually lossless, larger files |
-| `balanced` | `-crf 23 -preset medium` | Sensible default trade-off      |
-| `small`    | `-crf 28 -preset medium` | Smaller files, lower quality    |
+| Preset     | Means                      | Use it for                      |
+| ---------- | -------------------------- | ------------------------------- |
+| `high`     | Near-transparent quality   | Visually lossless, larger files |
+| `balanced` | Sensible default trade-off | Most transcodes                 |
+| `small`    | Noticeably compressed      | Smaller files, lower quality    |
 
 `quality` is **constant-quality** encoding, so it's mutually exclusive with an explicit video bitrate (`videoBitrate`, which targets a _size_) — setting both throws `InvalidOptionsError`. Pick one.
+
+Every encoder exposes that dial under a different flag and on a different scale, so the preset is translated for the encoder you actually picked:
+
+| Encoder family             | `high`                       | `balanced`                   | `small`                      |
+| -------------------------- | ---------------------------- | ---------------------------- | ---------------------------- |
+| `libx264` / `libx265`      | `-crf 18 -preset slow`       | `-crf 23 -preset medium`     | `-crf 28 -preset medium`     |
+| `*_nvenc` (NVIDIA)         | `-cq 19 -preset p6`          | `-cq 23 -preset p4`          | `-cq 28 -preset p4`          |
+| `*_qsv` (Intel Quick Sync) | `-global_quality 19`         | `-global_quality 23`         | `-global_quality 28`         |
+| `*_videotoolbox` (Apple)   | `-q:v 65`                    | `-q:v 55`                    | `-q:v 40`                    |
+| `*_vaapi` (Linux)          | `-qp 19`                     | `-qp 23`                     | `-qp 28`                     |
+| `*_amf` (AMD)              | `-rc cqp -qp_i 19 -qp_p 19`  | `… 23`                       | `… 28`                       |
+| `libvpx-vp9`               | `-crf 24 -b:v 0`             | `-crf 31 -b:v 0`             | `-crf 37 -b:v 0`             |
+| `libsvtav1`                | `-crf 28 -preset 6`          | `-crf 35 -preset 8`          | `-crf 45 -preset 8`          |
+| `libaom-av1`               | `-crf 25 -b:v 0 -cpu-used 4` | `-crf 32 -b:v 0 -cpu-used 5` | `-crf 40 -b:v 0 -cpu-used 6` |
+
+Hardware encoders are matched by **API suffix**, so `hevc_nvenc` and `av1_nvenc` follow the `*_nvenc` row. Note that `*_videotoolbox`'s scale is inverted (higher `-q:v` = better). An encoder in no known family (e.g. `mpeg4`) has no equivalent dial and throws `InvalidOptionsError` — use `videoBitrate` there.
+
+#### Hardware acceleration
+
+`hwaccel` decodes the input on the GPU. Pair it with a hardware `videoCodec` to move the encode there too:
+
+```ts
+import { listHwaccels, convert } from 'ffm-script';
+
+const accels = await listHwaccels(); // e.g. ['videotoolbox']
+
+await convert('input.mp4', 'output.mp4', {
+  hwaccel: 'videotoolbox', // -hwaccel: hardware decoding
+  videoCodec: 'h264_videotoolbox', // -c:v: hardware encoding
+  quality: 'balanced', // → -q:v 55, this encoder's dialect
+});
+```
+
+Common pairs: `cuda` + `h264_nvenc` (NVIDIA), `qsv` + `h264_qsv` (Intel), `videotoolbox` + `h264_videotoolbox` (macOS), `vaapi` + `h264_vaapi` (Linux).
+
+A few things worth knowing:
+
+- **`hwaccel` alone only accelerates decoding.** Frames are handed back to system memory afterwards, which is exactly what keeps it composable with `width`/`height` and every other filter-based option.
+- **`listHwaccels()` reports what the FFmpeg _build_ supports**, not what this machine can run — a build compiled with CUDA still lists `cuda` on a laptop with no NVIDIA GPU. Treat it as a shortlist and keep a software fallback.
+- **The value is passed to FFmpeg untouched**, so a method that isn't usable surfaces as an `FFmpegError` rather than a typed rejection. That's deliberate: validating against a fixed list would reject methods a newer FFmpeg supports.
+- **Full-GPU pipelines are out of scope.** Keeping frames on the device (`-hwaccel_output_format cuda` with `scale_cuda`) needs a filter chain this API doesn't build — reach for [`run`](#raw-ffmpeg--run) if you want that.
+
+`parallelConvert` takes both options too, applying them to every chunk — see [Parallel transcode](#parallel-transcode--parallelconvert).
 
 ### Cut — `trim`
 
@@ -284,8 +327,9 @@ const executor: SegmentExecutor = async (segment, ctx) => {
   // `segment` = { index, startTime, endTime? }; the last segment has no endTime (runs to EOF).
   // `ctx.encodeArgs` = the shared video-encode flags every chunk must use, e.g.
   //   ['-an', '-c:v', 'libx264', '-b:v', '2000k', '-vf', 'scale=1280:-2'].
+  // `ctx.inputArgs` = flags that must come BEFORE the -i (the hardware decoder); [] when none.
   // Dispatch it to a remote worker (HTTP, queue, …) that runs:
-  //   ffmpeg -ss <segment.startTime> -i <ctx.input> [-t <ctx.duration>] <ctx.encodeArgs> -y chunk.mp4
+  //   ffmpeg <ctx.inputArgs> -ss <segment.startTime> -i <ctx.input> [-t <ctx.duration>] <ctx.encodeArgs> -y chunk.mp4
   // then return the path to the retrieved chunk (readable on this machine for the join).
   return sendToRemoteWorker(segment, ctx);
 };
@@ -307,7 +351,19 @@ Prefer the low-level pieces? `resolveKeyframes` and `planSegments` are also expo
 
 `width` / `height` resize the output just like [`convert`](#transcode--convert) — set one to preserve the aspect ratio, or both to force exact dimensions. The same scale is applied to every chunk, so the joins stay artefact-free.
 
-The output container follows the extension — `.mp4`, `.mov` or `.mkv`. WebM is rejected: chunks are re-encoded to h264 and stream-copied at the joins, which WebM can't carry — use [`convert`](#output-container) for WebM.
+`videoCodec` picks the chunk encoder (default `libx264`), and `hwaccel` decodes each chunk on the GPU — the same options as [`convert`](#hardware-acceleration), applied identically to every chunk, which is what keeps the joins stream-copyable:
+
+```ts
+await parallelConvert('input.mp4', 'output.mp4', {
+  hwaccel: 'cuda',
+  videoCodec: 'h264_nvenc',
+  quality: 'balanced', // → -cq 23 -preset p4, this encoder's dialect
+});
+```
+
+The encoder must be muxable in the output container (checked up front, `InvalidFormatError` otherwise) since the chunks are joined and muxed with a stream copy. With a custom `executor`, `hwaccel` is handed over as `ctx.inputArgs` rather than used locally.
+
+The output container follows the extension — `.mp4`, `.mov` or `.mkv`. WebM is rejected: the chunks and the aac audio are stream-copied at the joins, which WebM can't carry — use [`convert`](#output-container) for WebM.
 
 ### Batch many files — `processBatch`
 

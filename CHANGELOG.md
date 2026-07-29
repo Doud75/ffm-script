@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-07-28
+
+### Added
+
+- **Hardware acceleration — `hwaccel`.** New option on `convert`, `parallelConvert` and the chainable `.convert()`: decodes the input on the GPU (FFmpeg `-hwaccel`, e.g. `'cuda'`, `'videotoolbox'`, `'qsv'`, `'vaapi'`). It accelerates **decoding** only — frames are handed back to system memory, which is what keeps it composable with `width`/`height`; pair it with a hardware `videoCodec` to move the encode there too. The value is passed to FFmpeg untouched, so a method a newer FFmpeg supports is never falsely rejected — an unusable one surfaces as an `FFmpegError`. Full-GPU pipelines (`-hwaccel_output_format` + `scale_cuda`) remain out of scope; use `run` for those.
+- **`listHwaccels()`.** Reports the acceleration methods this FFmpeg build was compiled with (memoized), so callers can pick one and keep a software fallback. Being listed means the _build_ supports it, not that the host can run it.
+- **`videoCodec` on `parallelConvert`.** The chunk encoder was hard-coded to `libx264`; it is now selectable, so the per-segment encodes can run on a hardware encoder. Every chunk still gets identical flags, so the joins stream-copy as before. A codec the output container can't carry throws `InvalidFormatError` up front. The intermediate chunk files now carry the output's container instead of always being MP4.
+- **`inputArgs` on `SegmentExecutorContext`.** Flags that must precede the `-i` (currently the hardware decoder), handed to custom executors separately from `encodeArgs`. A worker's command is `ffmpeg <inputArgs> -ss <startTime> -i <input> [-t <duration>] <encodeArgs> -y <chunk>`. Purely additive — executors receive the context, they don't build it.
+
+### Changed
+
+- **`quality` presets are now translated per encoder family** instead of assuming libx264's `-crf`. `quality: 'balanced'` becomes `-cq 23 -preset p4` on `*_nvenc`, `-global_quality 23` on `*_qsv`, `-q:v 55` on `*_videotoolbox` (an inverted scale), `-qp 23` on `*_vaapi`, `-rc cqp` on `*_amf`, `-crf 31 -b:v 0` on `libvpx-vp9`, and so on for `libsvtav1`/`libaom-av1`. Hardware encoders are matched by API suffix, so `hevc_nvenc` and `av1_nvenc` follow the same row.
+  - This **lifts the restriction** that `quality` required an x264/x265 codec: presets now work with WebM/VP9 and AV1 output, and with every hardware encoder above. Previously-rejected calls now succeed — a relaxation, not a break.
+  - An encoder in no known family (e.g. `mpeg4`) still throws `InvalidOptionsError`, now with a message listing the supported families and pointing at `videoBitrate`.
+  - The nvenc, qsv, videotoolbox, vp9 and AV1 mappings are exercised end-to-end; the **vaapi and amf** rows are derived from the FFmpeg documentation and are not covered by CI, which has no such hardware.
+
 ## [1.2.0] - 2026-07-21
 
 ### Added
@@ -164,6 +180,7 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
+[1.3.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.0.0

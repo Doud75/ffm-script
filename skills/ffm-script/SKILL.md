@@ -1,6 +1,6 @@
 ---
 name: ffm-script
-description: Use when writing, reviewing, or debugging Node.js/TypeScript code that uses the "ffm-script" npm package (a dependency-free FFmpeg CLI wrapper). Provides exact public API signatures, format/output constraints, the typed error hierarchy, and copy-paste recipes for probe, convert, parallelConvert, trim, extractAudio, thumbnail, toHLS, audioToHLS, overlay, subtitles, toAnimation, concat, setMetadata, run/runStream, and the chainable API. Use it instead of guessing signatures or option names.
+description: Use when writing, reviewing, or debugging Node.js/TypeScript code that uses the "ffm-script" npm package (a dependency-free FFmpeg CLI wrapper). Provides exact public API signatures, format/output constraints, hardware-acceleration and quality-preset mappings, the typed error hierarchy, and copy-paste recipes for probe, convert, parallelConvert, trim, extractAudio, thumbnail, toHLS, audioToHLS, overlay, subtitles, toAnimation, concat, setMetadata, run/runStream, listHwaccels, and the chainable API. Use it instead of guessing signatures or option names.
 ---
 
 # ffm-script
@@ -64,18 +64,46 @@ Stream-copies everything (`-c copy`) → lossless, near-instant. Works on audio-
 convert(input: string, output: string, options?: {
   videoCodec?: string    // -c:v; default depends on container (libx264 for mp4/mov/mkv, libvpx-vp9 for webm)
   audioCodec?: string    // -c:a; default aac (mp4/mov/mkv) or libopus (webm)
-  quality?: 'high' | 'balanced' | 'small'   // CRF preset; mutually exclusive with videoBitrate
+  quality?: 'high' | 'balanced' | 'small'   // constant-quality preset; mutually exclusive with videoBitrate
   videoBitrate?: string  // -b:v e.g. '2500k'
   audioBitrate?: string  // -b:a e.g. '192k'
   width?: number         // set one dimension to preserve aspect ratio
   height?: number
+  hwaccel?: string       // -hwaccel: hardware DECODER, e.g. 'cuda' | 'videotoolbox' | 'qsv' | 'vaapi' | 'none'
   onProgress?, signal?
 }): Promise<void>
 ```
 
 - Output container from extension: `.mp4`/`.mov`/`.mkv`/`.webm`.
-- `quality` maps to libx264 CRF + speed: `high`=`-crf 18 -preset slow`, `balanced`=`-crf 23 -preset medium`, `small`=`-crf 28 -preset medium`. **Constant-quality**, so mutually exclusive with `videoBitrate` (throws `InvalidOptionsError` if both). `quality` requires an x264/x265-family codec.
+- `quality` is **constant-quality**, so mutually exclusive with `videoBitrate` (throws `InvalidOptionsError` if both). It is translated per encoder family — see the table below. An encoder in no known family throws `InvalidOptionsError`: use `videoBitrate` there.
 - An explicit codec a container can't carry (e.g. `libx264` into `.webm`) throws `InvalidFormatError`.
+
+#### `quality` per encoder family
+
+| Encoder                                         | `high`                       | `balanced`                   | `small`                      |
+| ----------------------------------------------- | ---------------------------- | ---------------------------- | ---------------------------- |
+| `libx264` / `libx265` (+ `h264`/`hevc` aliases) | `-crf 18 -preset slow`       | `-crf 23 -preset medium`     | `-crf 28 -preset medium`     |
+| `*_nvenc`                                       | `-cq 19 -preset p6`          | `-cq 23 -preset p4`          | `-cq 28 -preset p4`          |
+| `*_qsv`                                         | `-global_quality 19`         | `-global_quality 23`         | `-global_quality 28`         |
+| `*_videotoolbox`                                | `-q:v 65`                    | `-q:v 55`                    | `-q:v 40`                    |
+| `*_vaapi`                                       | `-qp 19`                     | `-qp 23`                     | `-qp 28`                     |
+| `*_amf`                                         | `-rc cqp -qp_i 19 -qp_p 19`  | `… 23`                       | `… 28`                       |
+| `libvpx-vp9`                                    | `-crf 24 -b:v 0`             | `-crf 31 -b:v 0`             | `-crf 37 -b:v 0`             |
+| `libsvtav1`                                     | `-crf 28 -preset 6`          | `-crf 35 -preset 8`          | `-crf 45 -preset 8`          |
+| `libaom-av1`                                    | `-crf 25 -b:v 0 -cpu-used 4` | `-crf 32 -b:v 0 -cpu-used 5` | `-crf 40 -b:v 0 -cpu-used 6` |
+
+Hardware encoders are matched by **API suffix**, so `hevc_nvenc` and `av1_nvenc` follow the `*_nvenc` row. `*_videotoolbox`'s `-q:v` scale is inverted (higher = better).
+
+#### Hardware acceleration
+
+```ts
+listHwaccels(): Promise<string[]>   // e.g. ['videotoolbox'] — memoized
+```
+
+- `hwaccel` accelerates **decoding** only; frames come back to system memory, which is why it still composes with `width`/`height`. To accelerate the **encode**, pass a hardware `videoCodec` (`'h264_nvenc'`, `'h264_videotoolbox'`, `'hevc_qsv'`, …).
+- The value is passed to FFmpeg untouched — an unavailable method surfaces as `FFmpegError`, not a typed rejection. `listHwaccels()` reports what the FFmpeg **build** supports, which is not proof the host can run it: always keep a software fallback.
+- Blank/empty `hwaccel` → `InvalidOptionsError`. `'none'` is valid (explicit software decoding).
+- Full-GPU pipelines (`-hwaccel_output_format cuda` + `scale_cuda`) are **not** supported through these options — use `run` for that.
 
 ```ts
 parallelConvert(input: string, output: string, options?: {
@@ -86,16 +114,19 @@ parallelConvert(input: string, output: string, options?: {
   retryDelay?: number    // ms to wait between retry attempts (default 0)
   videoBitrate?: string  // -b:v; mutually exclusive with quality
   quality?: 'high' | 'balanced' | 'small'
+  videoCodec?: string    // -c:v for every chunk; default libx264. Must be muxable in the output container.
+  hwaccel?: string       // -hwaccel applied to every chunk read; handed to a custom executor as ctx.inputArgs
   width?: number
   height?: number
   onProgress?, signal?
 }): Promise<void>
 
-// SegmentExecutor: encode one segment, return the chunk path (h264, same params for every chunk).
+// SegmentExecutor: encode one segment, return the chunk path (same codec + params for every chunk).
 type SegmentExecutor = (
   segment: { index: number; startTime: number; endTime?: number },
   ctx: {
     input: string;        // source to encode from
+    inputArgs: string[];  // flags that must precede the -i (hardware decoder); [] when none
     encodeArgs: string[]; // shared video-encode flags every chunk must use verbatim
     duration: number;     // segment length in seconds (use for -t; last segment runs to EOF)
     onProgress?: (secondsProcessed: number) => void;
@@ -105,6 +136,8 @@ type SegmentExecutor = (
 ```
 
 Keyframe-aware parallel transcoding: splits on keyframes, re-encodes chunks across workers, joins without re-encoding. Output: `.mp4`/`.mov`/`.mkv` only — **`.webm` is rejected** (`InvalidFormatError`); use `convert` for WebM. Inputs: MP4/MOV/WebM/MKV.
+
+`videoCodec` and `hwaccel` open the chunk encodes to hardware; every chunk gets identical flags, so a GPU-encoded set still joins with a stream copy. A `videoCodec` the output container can't carry throws `InvalidFormatError` (checked before any work starts). A worker builds its command as `ffmpeg <inputArgs> -ss <startTime> -i <input> [-t <duration>] <encodeArgs> -y <chunk>`.
 
 **convert vs parallelConvert:** `parallelConvert` gives **no speedup on a single machine** — FFmpeg (libx264) already saturates every core with its internal threading, so local workers only re-share the same cores. It is the building block of the distributed chunked pipeline (YouTube/Netflix model): pass an `executor` to run each segment's encode on independent machines (`parallelConvert` still plans the split, encodes the audio in one pass, and joins the chunks) and throughput scales near-linearly. Locally it guarantees the pipeline's correctness (duration kept, artefact-free joins, drift-free audio). For a plain local transcode, short clips, WebM output, or a precise single-pass encode, use `convert`.
 
@@ -313,6 +346,7 @@ import {
   run,
   runStream,
   ffmscript,
+  listHwaccels,
 } from 'ffm-script';
 
 // Inspect
@@ -326,7 +360,14 @@ await convert('in.mp4', 'out.mp4', { quality: 'balanced', width: 1280 });
 await parallelConvert('movie.mkv', 'out.mp4', { workers: 4, quality: 'balanced' });
 
 // Transcode to WebM (use convert, NOT parallelConvert)
-await convert('in.mp4', 'out.webm'); // VP9 + Opus by default
+await convert('in.mp4', 'out.webm', { quality: 'balanced' }); // VP9 + Opus by default
+
+// Hardware-accelerated transcode, with a software fallback
+const accels = await listHwaccels();
+const gpu = accels.includes('videotoolbox')
+  ? { hwaccel: 'videotoolbox', videoCodec: 'h264_videotoolbox' }
+  : {};
+await convert('in.mp4', 'out.mp4', { ...gpu, quality: 'balanced' });
 
 // Batch: transcode many files with a bounded pool (fail-fast, results in input order)
 await processBatch(files, (f, i) => convert(f, outputs[i], { quality: 'balanced' }), {
@@ -396,6 +437,9 @@ await runStream(
 ## Gotchas to avoid
 
 - Don't set both `quality` and `videoBitrate` → `InvalidOptionsError`.
+- Don't assume `quality` means `-crf` — it is translated per encoder family, and an encoder in no known family (e.g. `mpeg4`) throws `InvalidOptionsError`. Use `videoBitrate` there.
+- Don't treat `hwaccel` as an encode accelerator: alone it only accelerates **decoding**. Pair it with a hardware `videoCodec`.
+- Don't assume a method from `listHwaccels()` works — it reflects the FFmpeg build, not the host. Keep a software fallback.
 - Don't reach for `parallelConvert` expecting a faster local encode — on one machine it performs like `convert`; its value is the distributed chunked pipeline.
 - Don't send `.webm` to `parallelConvert` → use `convert`.
 - `trim`, `overlay`, `burnSubtitles`, `concat`, and the chain `.save()` require a **`.mp4`** output.

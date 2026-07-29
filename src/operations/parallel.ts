@@ -1,14 +1,15 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { cpus, tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { extname, join } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { resolveBinary } from '../core/binary.js';
 import { spawnFFmpeg } from '../core/spawn.js';
 import { concatDemuxer } from '../core/concat.js';
 import { qualityArgs, assertQualityBitrateExclusive } from '../core/quality.js';
+import { buildHwaccelArgs } from '../core/hwaccel.js';
 import { buildScaleFilter } from '../core/scale.js';
 import { runPool, resolveConcurrency } from '../core/pool.js';
-import { resolveOutputContainer } from '../core/container.js';
+import { resolveOutputContainer, assertCodecAllowed } from '../core/container.js';
 import { validateInput } from '../core/validate.js';
 import { resolveKeyframes } from '../core/keyframes.js';
 import { VIDEO_INPUT_FORMATS } from '../core/formats.js';
@@ -115,6 +116,9 @@ async function withRetry<T>(
   }
 }
 
+/** Chunk encoder used when the caller doesn't pick one. */
+const DEFAULT_VIDEO_CODEC = 'libx264';
+
 /** Extra segments per worker, so a slow chunk can't leave the pool idle. */
 const SEGMENTS_PER_WORKER = 3;
 /** Don't carve chunks shorter than this — sub-chunk encoder warm-up isn't worth it. */
@@ -170,16 +174,19 @@ export function aggregateProgress(processedBySegment: number[], totalDuration: n
  *
  * Accepts MP4, MOV, WebM and MKV inputs — keyframes come from the ISOBMFF `stss`
  * box when available, otherwise from ffprobe. Output is MP4, MOV or MKV (chosen
- * from the output extension); the chunks are re-encoded to h264 and the audio to
- * aac, then joined with stream copy — codecs WebM cannot carry, so WebM output is
- * rejected (use {@link convert} for WebM).
+ * from the output extension); the chunks are re-encoded with `videoCodec`
+ * (`libx264` by default) and the audio to aac, then joined with stream copy —
+ * codecs WebM cannot carry, so WebM output is rejected (use {@link convert}).
+ *
+ * `videoCodec` and `hwaccel` open the chunk encodes to hardware: every segment
+ * gets the same flags, so a GPU-encoded chunk set still joins with a stream copy.
  *
  * @param input - Path to the source video (MP4/MOV/WebM/MKV).
  * @param output - Path to the destination file; its extension picks the container (`.mp4`/`.mov`/`.mkv`).
- * @param options - Worker/concurrency count, custom executor, retry policy, target bitrate/quality, output resolution, and progress/abort options.
+ * @param options - Worker/concurrency count, custom executor, retry policy, codec, hardware acceleration, target bitrate/quality, output resolution, and progress/abort options.
  * @throws {FileNotFoundError} when `input` does not exist.
- * @throws {InvalidFormatError} when `input` is not a supported video container, the output extension is unsupported or WebM, or the input has no video keyframes.
- * @throws {InvalidOptionsError} when `workers`/`concurrency` is not a positive integer, or `retries`/`retryDelay` is negative.
+ * @throws {InvalidFormatError} when `input` is not a supported video container, the output extension is unsupported or WebM, `videoCodec` is incompatible with the container, or the input has no video keyframes.
+ * @throws {InvalidOptionsError} when `workers`/`concurrency` is not a positive integer, `retries`/`retryDelay` is negative, or `quality` is combined with a bitrate or with an encoder that has no known preset scale.
  * @throws {FFmpegError} when any FFmpeg process exits non-zero.
  */
 export async function parallelConvert(
@@ -188,14 +195,20 @@ export async function parallelConvert(
   options: ParallelConvertOptions = {},
 ): Promise<void> {
   await validateInput(input, VIDEO_INPUT_FORMATS);
-  const { container } = resolveOutputContainer(output);
+  const { container, config } = resolveOutputContainer(output);
   if (container === 'webm') {
     throw new InvalidFormatError(
       output,
-      'parallelConvert cannot output WebM: its copy-based concat/mux pipeline produces h264/aac; use convert() for WebM',
+      'parallelConvert cannot output WebM: its copy-based concat/mux pipeline stream-copies the chunks and the aac audio; use convert() for WebM',
     );
   }
+  const videoCodec = options.videoCodec ?? DEFAULT_VIDEO_CODEC;
+  assertCodecAllowed(config, videoCodec, 'video', output);
   assertQualityBitrateExclusive(options.quality, options.videoBitrate);
+  // Built up front so an unusable codec/quality/hwaccel combination fails before
+  // any temp directory is created or any FFmpeg process is spawned.
+  const encodeArgs = buildSegmentEncodeArgs(options, videoCodec);
+  const inputArgs = buildHwaccelArgs(options.hwaccel);
 
   const localWorkers = resolveWorkers(options.workers, cpus().length);
   const concurrency =
@@ -213,16 +226,21 @@ export async function parallelConvert(
 
   const workDir = await mkdtemp(join(tmpdir(), 'ffm-parallel-'));
   try {
-    const executor = options.executor ?? createLocalExecutor(workDir);
+    // The intermediates carry the same container as the output, so a codec the
+    // caller picked for e.g. Matroska is never written into an .mp4 chunk.
+    const ext = extname(output).toLowerCase();
+    const executor = options.executor ?? createLocalExecutor(workDir, ext);
     // The audio is encoded as a single continuous pass and muxed back at the end.
     // Splitting audio across the chunks would re-prime the AAC encoder at every
     // junction, accumulating gaps/drift and an A/V offset. Keeping it whole makes
     // the joins seamless regardless of how many chunks the video is cut into.
     const audioTrack = audio !== null ? join(workDir, 'audio.m4a') : undefined;
-    const videoTarget = audioTrack === undefined ? output : join(workDir, 'video.mp4');
+    const videoTarget = audioTrack === undefined ? output : join(workDir, `video${ext}`);
 
     await Promise.all([
       transcodeSegments(input, segments, totalDuration, concurrency, executor, options, {
+        inputArgs,
+        encodeArgs,
         retries,
         retryDelay,
       }).then((chunks) =>
@@ -252,9 +270,9 @@ export async function parallelConvert(
  * The scale filter (when set) is identical on every chunk, and since all chunks
  * share the source dimensions the `-2` placeholder resolves the same everywhere.
  */
-function buildSegmentEncodeArgs(options: ParallelConvertOptions): string[] {
-  const args = ['-an', '-c:v', 'libx264'];
-  if (options.quality !== undefined) args.push(...qualityArgs(options.quality));
+function buildSegmentEncodeArgs(options: ParallelConvertOptions, videoCodec: string): string[] {
+  const args = ['-an', '-c:v', videoCodec];
+  if (options.quality !== undefined) args.push(...qualityArgs(options.quality, videoCodec));
   if (options.videoBitrate !== undefined) args.push('-b:v', options.videoBitrate);
   const scale = buildScaleFilter(options.width, options.height);
   if (scale !== undefined) args.push('-vf', scale);
@@ -266,11 +284,12 @@ function buildSegmentEncodeArgs(options: ParallelConvertOptions): string[] {
  * process into `workDir`, wrapping the shared encode args with the segment's seek
  * and (for all but the final segment) its duration.
  */
-function createLocalExecutor(workDir: string): SegmentExecutor {
+function createLocalExecutor(workDir: string, ext: string): SegmentExecutor {
   const binary = resolveBinary('ffmpeg');
   return async (segment, ctx) => {
-    const chunk = join(workDir, `chunk_${String(segment.index).padStart(4, '0')}.mp4`);
+    const chunk = join(workDir, `chunk_${String(segment.index).padStart(4, '0')}${ext}`);
     const args = [
+      ...ctx.inputArgs,
       '-ss',
       String(segment.startTime),
       '-i',
@@ -309,11 +328,10 @@ async function transcodeSegments(
   concurrency: number,
   executor: SegmentExecutor,
   options: ParallelConvertOptions,
-  retry: { retries: number; retryDelay: number },
+  shared: { inputArgs: string[]; encodeArgs: string[]; retries: number; retryDelay: number },
 ): Promise<string[]> {
   const chunks: string[] = [];
   const processedBySegment = new Array<number>(segments.length).fill(0);
-  const encodeArgs = buildSegmentEncodeArgs(options);
 
   // Captured (and narrowed) once: the per-segment reporter only exists when the
   // caller wants progress, so there is no dead undefined-check on the hot path.
@@ -331,7 +349,8 @@ async function transcodeSegments(
       seg.endTime !== undefined ? seg.endTime - seg.startTime : totalDuration - seg.startTime;
     const ctx: SegmentExecutorContext = {
       input,
-      encodeArgs,
+      inputArgs: shared.inputArgs,
+      encodeArgs: shared.encodeArgs,
       duration,
       ...(reportAggregate !== undefined
         ? { onProgress: (secondsProcessed: number) => reportAggregate(seg.index, secondsProcessed) }
@@ -340,8 +359,8 @@ async function transcodeSegments(
     };
     chunks[seg.index] = await withRetry(
       () => executor(seg, ctx),
-      retry.retries,
-      retry.retryDelay,
+      shared.retries,
+      shared.retryDelay,
       options.signal,
       // A failed attempt may have reported partial seconds — reset so the retry
       // doesn't leave a stale count inflating the aggregate.

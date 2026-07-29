@@ -1,4 +1,5 @@
 export { checkDependencies } from './core/binary.js';
+export { listHwaccels } from './core/hwaccel.js';
 export { probe } from './operations/probe.js';
 export { convert } from './operations/convert.js';
 export { trim } from './operations/trim.js';
