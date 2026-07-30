@@ -21,6 +21,45 @@ function assertTrack(track: number): void {
 }
 
 /**
+ * Resolves the `subtitles` filter that renders the requested subtitles onto the
+ * frame, from either an external file or an embedded track of `input` — validating
+ * the source in both cases. Shared by {@link burnSubtitles} and the chainable API,
+ * so both accept the same sources and reject with the same messages.
+ *
+ * Internal: not exported from the package.
+ *
+ * @throws {FileNotFoundError} when the external subtitle file does not exist.
+ * @throws {InvalidFormatError} when the external file's extension is unsupported, or `input` has no embedded subtitle track.
+ * @throws {InvalidOptionsError} when `track` is not a non-negative integer or is out of range.
+ */
+export async function resolveBurnSubtitlesFilter(
+  input: string,
+  options: BurnSubtitlesOptions,
+): Promise<string> {
+  if (options.subtitles !== undefined) {
+    await validateInput(options.subtitles, SUBTITLE_FORMATS);
+    return buildSubtitlesFilter(options.subtitles);
+  }
+
+  const track = options.track ?? 0;
+  assertTrack(track);
+  const subtitleCount = await countSubtitleStreams(input);
+  if (subtitleCount === 0) {
+    throw new InvalidFormatError(
+      input,
+      'input has no subtitle track to burn (pass options.subtitles for an external file)',
+    );
+  }
+  if (track >= subtitleCount) {
+    throw new InvalidOptionsError(
+      `subtitle track ${track} does not exist (input has ${subtitleCount})`,
+    );
+  }
+  // The subtitles filter reads the embedded track straight from the input file.
+  return buildSubtitlesFilter(input, track);
+}
+
+/**
  * Extracts a subtitle track from a video into a standalone subtitle file. The
  * format is taken from the output extension (`.srt`, `.vtt` or `.ass`), and
  * FFmpeg converts the embedded codec to it (e.g. MP4 `mov_text` → SubRip).
@@ -94,28 +133,7 @@ export async function burnSubtitles(
     throw new InvalidFormatError(output, 'output must be an .mp4 file');
   }
 
-  let filter: string;
-  if (options.subtitles !== undefined) {
-    await validateInput(options.subtitles, SUBTITLE_FORMATS);
-    filter = buildSubtitlesFilter(options.subtitles);
-  } else {
-    const track = options.track ?? 0;
-    assertTrack(track);
-    const subtitleCount = await countSubtitleStreams(input);
-    if (subtitleCount === 0) {
-      throw new InvalidFormatError(
-        input,
-        'input has no subtitle track to burn (pass options.subtitles for an external file)',
-      );
-    }
-    if (track >= subtitleCount) {
-      throw new InvalidOptionsError(
-        `subtitle track ${track} does not exist (input has ${subtitleCount})`,
-      );
-    }
-    // The subtitles filter reads the embedded track straight from the input file.
-    filter = buildSubtitlesFilter(input, track);
-  }
+  const filter = await resolveBurnSubtitlesFilter(input, options);
 
   const duration = options.onProgress !== undefined ? (await probe(input)).duration : undefined;
 

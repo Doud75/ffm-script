@@ -280,6 +280,28 @@ await ffmscript('input.mp4')
   .save('output.mp4', { onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`) });
 ```
 
+#### Composable filters — one pass, one re-encode
+
+`.burnSubtitles()` and `.overlay()` join the same pass, so resizing, burning in subtitles and stamping a watermark cost **one** re-encode instead of three (three decodes, three encodes, a lost generation each round):
+
+```ts
+await ffmscript('input.mp4')
+  .trim({ start: 2, end: 30 })
+  .convert({ width: 1280, quality: 'balanced' })
+  .burnSubtitles({ subtitles: 'subs.srt' }) // or { track: 0 } for an embedded one
+  .overlay({ watermark: 'logo.png', position: 'top-right', opacity: 0.6, width: 120 })
+  .save('output.mp4');
+```
+
+They take the same options as [`burnSubtitles`](#subtitles--extractsubtitles--burnsubtitles) and [`overlay`](#watermark--overlay) — minus `onProgress`/`signal`, which belong to `.save()`. The last call of each wins.
+
+The filters always run in a **fixed order**, whatever the call order: **scale → subtitles → overlay**. Scaling first renders the subtitles at the output resolution (crisp text, instead of being burnt in and then resampled), and the watermark comes last so it sits on top of them.
+
+Two things to know:
+
+- With `.trim()`, subtitle cues land on the **trimmed** timeline: the input seek restarts timestamps, so a cue at `00:00:01` shows one second after the cut, not one second into the original file.
+- A watermark needs a second input, so that pass is built as a `-filter_complex` with explicit stream mapping. `.raw()` flags that would override it (`-vf`, `-filter:v`, `-filter_complex`, `-map`) throw an `InvalidOptionsError` rather than silently producing a wrong output — build the whole graph yourself with `.raw()` or [`run`](#raw-ffmpeg--run) in that case.
+
 Need a flag the typed options don't expose? `.raw(args)` injects arbitrary FFmpeg arguments into the same fused pass — the in-pipeline counterpart to [`run`](#raw-ffmpeg--run):
 
 ```ts
