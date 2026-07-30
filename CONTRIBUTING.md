@@ -4,6 +4,10 @@ Thanks for your interest in improving `ffm-script`! This document explains how t
 set up the project, the workflow we follow, and what CI expects before a pull
 request can be merged.
 
+By taking part you agree to follow our [Code of Conduct](CODE_OF_CONDUCT.md). If
+you've found a **security vulnerability**, don't open an issue or a PR — follow
+[SECURITY.md](SECURITY.md) to report it privately.
+
 ## Getting started
 
 You'll need **Node.js >= 22** and **FFmpeg** (which provides both `ffmpeg` and

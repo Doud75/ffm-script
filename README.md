@@ -608,7 +608,11 @@ For Codex or Cursor, use `.agents/skills/ffm-script/` instead. The agent then lo
 
 ## Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, project layout, branch and commit conventions, and the checks CI expects before a pull request can be merged. Bugs and feature requests go through the [issue templates](https://github.com/Doud75/ffm-script/issues/new/choose).
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup, project layout, branch and commit conventions, and the checks CI expects before a pull request can be merged. Bugs and feature requests go through the [issue templates](https://github.com/Doud75/ffm-script/issues/new/choose). Participation is governed by our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Security
+
+Found a vulnerability? Please don't open a public issue — report it privately as described in [SECURITY.md](SECURITY.md), which also covers what's in scope for a wrapper around the FFmpeg binaries.
 
 ## License
 
