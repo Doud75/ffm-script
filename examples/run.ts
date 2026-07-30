@@ -15,6 +15,7 @@ import concat from './concat.js';
 import hls from './hls.js';
 import audioHls from './audio-hls.js';
 import chain from './chain.js';
+import filters from './filters.js';
 import parallel from './parallel.js';
 import batch from './batch.js';
 import hwaccel from './hwaccel.js';
@@ -42,6 +43,7 @@ const examples: Example[] = [
   { name: 'hls', run: hls },
   { name: 'audio-hls', run: audioHls },
   { name: 'chain', run: chain },
+  { name: 'filters', run: filters },
   { name: 'parallel', run: parallel },
   { name: 'batch', run: batch },
   { name: 'hwaccel', run: hwaccel },

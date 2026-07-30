@@ -276,11 +276,20 @@ Streaming counterpart to `run`: data flows through the process **without bufferi
 ffmscript(input: string)
   .trim(options: TrimOptions)
   .convert(options: ConvertOptions)
+  .burnSubtitles(options?: BurnSubtitlesOptions)   // burn subs into the picture, same pass
+  .overlay(options: OverlayOptions)                // watermark on top, same pass
   .raw(args: string[])          // inject raw flags on the output side; forces re-encode
   .save(output: string, options?: { onProgress?, signal? }): Promise<void>
 ```
 
-Fuses `trim` + `convert` into a **single** FFmpeg pass. Order-independent. Output must be `.mp4`. `.save()` throws `InvalidOptionsError` if no operation was queued. `.raw()` flags are appended after generated ones, so explicit flags win (a `-vf` overrides the scale from `.convert({ width })`).
+Fuses `trim` + `convert` + `burnSubtitles` + `overlay` into a **single** FFmpeg pass (one re-encode instead of one per operation). Call order-independent. Output must be `.mp4`. `.save()` throws `InvalidOptionsError` if no operation was queued. The last call of each method wins. `.raw()` flags are appended after generated ones, so explicit flags win (a `-vf` overrides the scale from `.convert({ width })`).
+
+`.burnSubtitles()`/`.overlay()` take the same options as the standalone `burnSubtitles`/`overlay`, except `onProgress`/`signal`, which are ignored (they belong to `.save()`), and they validate identically (`FileNotFoundError` for a missing watermark/`.srt`, `InvalidOptionsError` for an out-of-range `opacity`/`margin`/`width`/`track`).
+
+Filters run in a **fixed order** regardless of call order: **scale → subtitles → overlay** — subtitles are rendered at the output resolution, and the watermark sits on top of them. Two consequences:
+
+- With `.trim()`, subtitle cues are on the **trimmed** timeline (the input seek restarts timestamps).
+- `.overlay()` builds a `-filter_complex` with explicit `-map`s (the watermark is a second input), so `.raw()` carrying `-vf`, `-filter:v`, `-filter_complex` or `-map` throws `InvalidOptionsError` instead of silently overriding the graph.
 
 ### Batch
 
@@ -381,6 +390,13 @@ await trim('in.mp4', 'cut.mp4', { start: '00:01:00', end: '00:03:00', mode: 'pre
 // One-pass trim + resize
 await ffmscript('in.mp4').trim({ start: 60, end: 180 }).convert({ width: 1280 }).save('out.mp4');
 
+// One-pass resize + burnt subtitles + watermark (order applied: scale → subs → overlay)
+await ffmscript('in.mp4')
+  .convert({ width: 1280, quality: 'balanced' })
+  .burnSubtitles({ subtitles: 'subs.srt' })
+  .overlay({ watermark: 'logo.png', position: 'top-right', opacity: 0.6 })
+  .save('out.mp4');
+
 // Audio, thumbnail, GIF
 await extractAudio('in.mp4', 'out.mp3', { bitrate: '320k' });
 await thumbnail('in.mp4', 'thumb.jpg', { timestamp: 30, width: 640 });
@@ -443,6 +459,8 @@ await runStream(
 - Don't reach for `parallelConvert` expecting a faster local encode — on one machine it performs like `convert`; its value is the distributed chunked pipeline.
 - Don't send `.webm` to `parallelConvert` → use `convert`.
 - `trim`, `overlay`, `burnSubtitles`, `concat`, and the chain `.save()` require a **`.mp4`** output.
+- Don't run `convert` → `burnSubtitles` → `overlay` as three calls: that's three re-encodes. Chain them (`ffmscript(…).convert().burnSubtitles().overlay().save()`) for a single pass.
+- Don't expect the chain to honour your filter call order — it is always scale → subtitles → overlay.
 - `run`/`runStream` don't auto-probe — pass `duration` if you want a progress percentage.
 - For piped I/O, a plain MP4 won't work (no seeking) — use MPEG-TS, MKV, or fragmented MP4.
 - Output extension determines the container; there is no format option.

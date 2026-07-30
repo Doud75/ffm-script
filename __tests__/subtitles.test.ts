@@ -1,21 +1,11 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { extractSubtitles, burnSubtitles } from '../src/operations/subtitles.js';
 import { escapeSubtitlesPath, buildSubtitlesFilter } from '../src/core/subtitles.js';
 import { probe } from '../src/operations/probe.js';
 import { FileNotFoundError, InvalidFormatError, InvalidOptionsError } from '../src/errors/index.js';
-import { SAMPLE } from './helpers.js';
-
-const SRT = `1
-00:00:00,000 --> 00:00:04,000
-Hello world
-
-2
-00:00:04,000 --> 00:00:09,000
-Second cue
-`;
+import { SAMPLE, makeSrt, makeMkvWithSubs } from './helpers.js';
 
 describe('escapeSubtitlesPath', () => {
   it("escapes the filtergraph metacharacters \\ : and '", () => {
@@ -41,28 +31,8 @@ describe('subtitles operations', () => {
 
   beforeAll(() => {
     dir = mkdtempSync(join(tmpdir(), 'ffm-subs-'));
-    srt = join(dir, 'subs.srt');
-    writeFileSync(srt, SRT);
-    withSubs = join(dir, 'with-subs.mkv');
-    // Mux the SRT into the sample as an embedded subtitle stream.
-    execFileSync('ffmpeg', [
-      '-y',
-      '-loglevel',
-      'error',
-      '-i',
-      SAMPLE,
-      '-i',
-      srt,
-      '-map',
-      '0',
-      '-map',
-      '1',
-      '-c',
-      'copy',
-      '-c:s',
-      'srt',
-      withSubs,
-    ]);
+    srt = makeSrt(dir);
+    withSubs = makeMkvWithSubs(dir, srt);
   });
 
   afterAll(() => {

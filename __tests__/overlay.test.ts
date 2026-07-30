@@ -3,10 +3,10 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { overlay } from '../src/operations/overlay.js';
-import { buildOverlayFilter } from '../src/core/overlay.js';
+import { buildOverlayFilter, resolveOverlayParams } from '../src/core/overlay.js';
 import { probe } from '../src/operations/probe.js';
 import { FileNotFoundError, InvalidFormatError, InvalidOptionsError } from '../src/errors/index.js';
-import { SAMPLE } from './helpers.js';
+import { SAMPLE, makeWatermark } from './helpers.js';
 
 describe('buildOverlayFilter', () => {
   it('overlays the watermark directly when opaque and unscaled', () => {
@@ -42,6 +42,50 @@ describe('buildOverlayFilter', () => {
       '[1:v]format=rgba,colorchannelmixer=aa=0.3,scale=120:-1[wm];[0:v][wm]overlay=0:0[out]',
     );
   });
+
+  it('lays the watermark onto a custom base label', () => {
+    const params = { position: 'top-left', margin: 0, opacity: 1, width: undefined } as const;
+    expect(buildOverlayFilter(params, '[base]')).toBe('[base][1:v]overlay=0:0[out]');
+    expect(buildOverlayFilter({ ...params, opacity: 0.5 }, '[base]')).toBe(
+      '[1:v]format=rgba,colorchannelmixer=aa=0.5[wm];[base][wm]overlay=0:0[out]',
+    );
+  });
+});
+
+describe('resolveOverlayParams', () => {
+  it('applies the defaults: bottom-right, 10px margin, fully opaque, native size', () => {
+    expect(resolveOverlayParams({ watermark: 'wm.png' })).toEqual({
+      position: 'bottom-right',
+      margin: 10,
+      opacity: 1,
+      width: undefined,
+    });
+  });
+
+  it('keeps the explicit values', () => {
+    expect(
+      resolveOverlayParams({
+        watermark: 'wm.png',
+        position: 'center',
+        margin: 0,
+        opacity: 0.4,
+        width: 200,
+      }),
+    ).toEqual({ position: 'center', margin: 0, opacity: 0.4, width: 200 });
+  });
+
+  it.each([
+    ['opacity above 1', { opacity: 1.5 }],
+    ['negative opacity', { opacity: -0.1 }],
+    ['fractional margin', { margin: 1.5 }],
+    ['negative margin', { margin: -1 }],
+    ['zero width', { width: 0 }],
+    ['fractional width', { width: 10.5 }],
+  ])('rejects %s', (_label, bad) => {
+    expect(() => resolveOverlayParams({ watermark: 'wm.png', ...bad })).toThrow(
+      InvalidOptionsError,
+    );
+  });
 });
 
 describe('overlay', () => {
@@ -50,20 +94,7 @@ describe('overlay', () => {
 
   beforeAll(() => {
     dir = mkdtempSync(join(tmpdir(), 'ffm-overlay-'));
-    watermark = join(dir, 'wm.png');
-    // A 100x50 solid PNG is enough to exercise the overlay path.
-    execFileSync('ffmpeg', [
-      '-y',
-      '-loglevel',
-      'error',
-      '-f',
-      'lavfi',
-      '-i',
-      'color=red:size=100x50',
-      '-frames:v',
-      '1',
-      watermark,
-    ]);
+    watermark = makeWatermark(dir);
   });
 
   afterAll(() => {

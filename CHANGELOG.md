@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-07-30
+
+### Added
+
+- **Composable filters — `.burnSubtitles()` and `.overlay()` on the chainable API.** `scale`, `subtitles` and `overlay` each built their own video filter, so combining them meant running `convert` → `burnSubtitles` → `overlay` in sequence: three FFmpeg processes, three decode/encode round-trips, a lost generation each time. The two new chain methods join the existing fused pass, so `ffmscript(input).convert({ width }).burnSubtitles({ subtitles }).overlay({ watermark }).save(output)` is **one** re-encode. They take the same options as the standalone `burnSubtitles`/`overlay` (external `.srt`/`.vtt`/`.ass` file or an embedded `track`; watermark `position`/`margin`/`opacity`/`width`), validate identically, and ignore `onProgress`/`signal` — those belong to `.save()`, like `.convert()`'s. The last call of each method wins. **Purely additive**: no new export, no new type, and a chain without them builds exactly the same FFmpeg arguments as before.
+  - **Fixed filter order, whatever the call order: scale → subtitles → overlay.** Scaling first renders the subtitles at the output resolution (crisp text instead of burnt in then resampled) and leaves fewer pixels for the later stages; the watermark comes last so it sits on top of the burnt-in subtitles.
+  - With `.trim()`, subtitle cues land on the **trimmed** timeline — the input seek restarts timestamps, so a cue at `00:00:01` shows one second after the cut.
+  - Because a watermark is a second FFmpeg input, that pass is built as a `-filter_complex` with explicit `-map`s (`-map 0:a?` keeps a silent input working). A `.raw()` carrying `-vf`, `-filter:v`, `-filter_complex` or `-map` alongside `.overlay()` now throws `InvalidOptionsError` instead of silently overriding the graph and writing a wrong output. Without a watermark the filters stay a plain `-vf`, which a raw `-vf` still overrides as documented.
+  - Since the picture changes, `.overlay()`/`.burnSubtitles()` force the re-encode the chain already applies to `.convert()`/`raw`/a precise trim; the audio follows the chain's usual re-encode (`-c:a aac` by default) rather than the stream copy the standalone `overlay` does.
+- **New pure module `src/core/filtergraph.ts`** (`buildFilterGraph`), which assembles the existing `buildScaleFilter`/`buildSubtitlesFilter`/`buildOverlayFilter` output into a single filter chain — a `-vf` on one input, a labelled `-filter_complex` as soon as the watermark's second input is involved.
+
+### Changed
+
+- `buildOverlayFilter` takes an optional second argument, the label of the stream the watermark is laid onto (default `'[0:v]'`), which is what lets it stack on top of another filter stage. Internal — the default keeps every existing call and its output unchanged.
+- The watermark option defaults and range checks moved from `operations/overlay.ts` into `core/overlay.ts` as `resolveOverlayParams`, and the subtitle-source resolution (external file vs embedded track, with its validations) into an internal `resolveBurnSubtitlesFilter` — shared by the standalone operations and the chain, so both reject the same values with the same messages. No behaviour change.
+
 ## [1.3.0] - 2026-07-28
 
 ### Added
@@ -180,6 +196,7 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
+[1.4.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.2.0
 [1.1.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.1.0
