@@ -1,6 +1,6 @@
 ---
 name: ffm-script
-description: Use when writing, reviewing, or debugging Node.js/TypeScript code that uses the "ffm-script" npm package (a dependency-free FFmpeg CLI wrapper). Provides exact public API signatures, format/output constraints, hardware-acceleration and quality-preset mappings, the typed error hierarchy, and copy-paste recipes for probe, convert, parallelConvert, trim, extractAudio, thumbnail, toHLS, audioToHLS, overlay, subtitles, toAnimation, concat, setMetadata, run/runStream, listHwaccels, and the chainable API. Use it instead of guessing signatures or option names.
+description: Use when writing, reviewing, or debugging Node.js/TypeScript code that uses the "ffm-script" npm package (a dependency-free FFmpeg CLI wrapper). Provides exact public API signatures, format/output constraints, hardware-acceleration and quality-preset mappings, the typed error hierarchy, and copy-paste recipes for probe, convert, parallelConvert, trim, extractAudio, normalizeAudio, resampleAudio, trimSilence, thumbnail, toHLS, audioToHLS, overlay, subtitles, toAnimation, concat, setMetadata, run/runStream, listHwaccels, and the chainable API. Use it instead of guessing signatures or option names.
 ---
 
 # ffm-script
@@ -164,6 +164,45 @@ extractAudio(input: string, output: string, options?: {
 ```
 
 Output `.mp3` / `.aac` / `.m4a`. Accepts video or audio-only input.
+
+```ts
+normalizeAudio(input: string, output: string, options?: {
+  targetLoudness?: number  // loudnorm I, LUFS; default -16 (streaming). EBU R128 broadcast = -23. Range [-70, -5]
+  truePeak?: number        // loudnorm TP, dBTP; default -1.5. Range [-9, 0]
+  loudnessRange?: number   // loudnorm LRA, LU; default 11. Range [1, 50]
+  sampleRate?: number      // -ar; default = the input's own rate
+  audioCodec?: string      // -c:a; default inferred from the output extension
+  audioBitrate?: string    // -b:a e.g. '192k'
+  onProgress?, signal?
+}): Promise<void>
+```
+
+EBU R128 loudness normalisation, run as **two FFmpeg passes**: the first measures, the second corrects with those measurements (a one-pass `loudnorm` rides the level and audibly pumps). Accepts video or audio input; output may be `.mp3` / `.aac` / `.m4a` / `.wav` / `.flac` (video dropped) or `.mp4` / `.mov` / `.mkv` / `.webm` (video **copied**, `-c:v copy`). `onProgress` spans both passes as one 0–100 % timeline.
+
+```ts
+resampleAudio(input: string, output: string, options?: {
+  sampleRate?: number      // -ar, Hz. Range [8000, 192000]
+  channels?: number        // -ac, e.g. 1 = mono. Range [1, 8]
+  audioCodec?: string      // -c:a; default inferred from the output extension
+  audioBitrate?: string    // -b:a
+  onProgress?, signal?
+}): Promise<void>
+```
+
+At least one of `sampleRate` / `channels` is required (else `InvalidOptionsError`). Same input/output formats as `normalizeAudio`, video copied the same way.
+
+```ts
+trimSilence(input: string, output: string, options?: {
+  mode?: 'start' | 'end' | 'both' | 'all'  // default 'both'
+  threshold?: number       // dB below which audio counts as silence; default -50
+  minDuration?: number     // seconds; 'all' only — interior silence is shortened to this; default 1
+  keepSilence?: number     // seconds of lead-in kept; default 0
+  audioCodec?: string, audioBitrate?: string
+  signal?                  // NO onProgress — see below
+}): Promise<void>
+```
+
+**Audio in, audio out** (`.mp3` / `.aac` / `.m4a` / `.wav` / `.flac` both sides): a video input is rejected with `InvalidFormatError`, because cutting the audio timeline without cutting the picture would desynchronise them. No `onProgress`: the output is shorter than the input by design, so any percentage derived from FFmpeg's timestamps would be wrong.
 
 ```ts
 thumbnail(input: string, output: string, options: {   // options REQUIRED
@@ -344,6 +383,9 @@ import {
   processBatch,
   trim,
   extractAudio,
+  normalizeAudio,
+  resampleAudio,
+  trimSilence,
   thumbnail,
   toHLS,
   audioToHLS,
@@ -399,6 +441,19 @@ await ffmscript('in.mp4')
 
 // Audio, thumbnail, GIF
 await extractAudio('in.mp4', 'out.mp3', { bitrate: '320k' });
+
+// Loudness-normalise a podcast episode (2 passes, -16 LUFS)
+await normalizeAudio('episode.wav', 'episode.mp3', { audioBitrate: '192k' });
+
+// Normalise a video's soundtrack, leaving the picture untouched (-c:v copy)
+await normalizeAudio('in.mp4', 'out.mp4');
+
+// Downmix to 16kHz mono for a speech-to-text pipeline
+await resampleAudio('in.mp4', 'speech.wav', { sampleRate: 16000, channels: 1 });
+
+// Strip the dead air at both ends, keeping 0.2s of lead-in
+await trimSilence('take.wav', 'tight.wav', { keepSilence: 0.2 });
+
 await thumbnail('in.mp4', 'thumb.jpg', { timestamp: 30, width: 640 });
 await toAnimation('in.mp4', 'clip.gif', { start: 3, end: 6, fps: 12, width: 480 });
 
@@ -461,6 +516,10 @@ await runStream(
 - `trim`, `overlay`, `burnSubtitles`, `concat`, and the chain `.save()` require a **`.mp4`** output.
 - Don't run `convert` → `burnSubtitles` → `overlay` as three calls: that's three re-encodes. Chain them (`ffmscript(…).convert().burnSubtitles().overlay().save()`) for a single pass.
 - Don't expect the chain to honour your filter call order — it is always scale → subtitles → overlay.
+- `normalizeAudio` decodes the input **twice** (measure, then correct) — budget roughly double the wall time of a one-pass encode.
+- Don't hand `trimSilence` a video file: it's rejected on purpose. Cutting audio without cutting the picture desynchronises them.
+- `trimSilence`'s `end`/`both`/`all` modes use `areverse`, which buffers the **whole** stream in memory — fine for a podcast episode, not for a multi-hour recording.
+- `minDuration` only bites in `mode: 'all'`; the edge modes remove their silence whatever its length.
 - `run`/`runStream` don't auto-probe — pass `duration` if you want a progress percentage.
 - For piped I/O, a plain MP4 won't work (no seeking) — use MPEG-TS, MKV, or fragmented MP4.
 - Output extension determines the container; there is no format option.

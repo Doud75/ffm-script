@@ -41,6 +41,57 @@ export function makeSrt(dir: string, name = 'subs.srt'): string {
   return path;
 }
 
+/**
+ * Writes a 7s WAV: 2s of silence, 3s of a 440Hz tone, 2s of silence. The
+ * committed sample is a continuous tone, so silence trimming needs its own
+ * source — generated rather than committed, like the watermark.
+ */
+export function makeSilencePaddedWav(dir: string, name = 'padded.wav'): string {
+  const path = join(dir, name);
+  ffmpeg([
+    '-f',
+    'lavfi',
+    '-i',
+    'anullsrc=r=44100:cl=mono:d=2',
+    '-f',
+    'lavfi',
+    '-i',
+    'sine=frequency=440:r=44100:d=3',
+    '-f',
+    'lavfi',
+    '-i',
+    'anullsrc=r=44100:cl=mono:d=2',
+    '-filter_complex',
+    '[0:a][1:a][2:a]concat=n=3:v=0:a=1[out]',
+    '-map',
+    '[out]',
+    path,
+  ]);
+  return path;
+}
+
+/** Writes a 2s MP4 carrying picture and no audio stream at all. */
+export function makeVideoWithoutAudio(dir: string, name = 'mute.mp4'): string {
+  const path = join(dir, name);
+  ffmpeg([
+    '-f',
+    'lavfi',
+    '-i',
+    'testsrc=size=320x240:rate=15:duration=2',
+    '-pix_fmt',
+    'yuv420p',
+    path,
+  ]);
+  return path;
+}
+
+/** Writes 2s of pure silence — `loudnorm` measures it as `-inf`. */
+export function makeSilentWav(dir: string, name = 'silent.wav'): string {
+  const path = join(dir, name);
+  ffmpeg(['-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono:d=2', path]);
+  return path;
+}
+
 /** Muxes `srt` into the sample as an embedded subtitle stream (MKV). */
 export function makeMkvWithSubs(dir: string, srt: string, name = 'with-subs.mkv'): string {
   const path = join(dir, name);

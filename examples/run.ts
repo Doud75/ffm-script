@@ -6,6 +6,7 @@ import convert from './convert.js';
 import progress from './progress.js';
 import trim from './trim.js';
 import extractAudio from './extract-audio.js';
+import audio from './audio.js';
 import thumbnail from './thumbnail.js';
 import overlay from './overlay.js';
 import subtitles from './subtitles.js';
@@ -34,6 +35,7 @@ const examples: Example[] = [
   { name: 'progress', run: progress },
   { name: 'trim', run: trim },
   { name: 'extract-audio', run: extractAudio },
+  { name: 'audio', run: audio },
   { name: 'thumbnail', run: thumbnail },
   { name: 'overlay', run: overlay },
   { name: 'subtitles', run: subtitles },

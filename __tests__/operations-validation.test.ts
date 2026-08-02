@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { Readable, Writable } from 'node:stream';
 import { thumbnail } from '../src/operations/thumbnail.js';
 import { extractAudio } from '../src/operations/extract.js';
+import { normalizeAudio, resampleAudio, trimSilence } from '../src/operations/audio.js';
 import { trim } from '../src/operations/trim.js';
 import { convert } from '../src/operations/convert.js';
 import { toAnimation } from '../src/operations/animation.js';
@@ -208,6 +209,42 @@ describe('audioToHLS validation', () => {
         signal: aborted(),
       }),
     ).rejects.toMatchObject(isAbort);
+  });
+});
+
+describe('audio toolkit validation', () => {
+  it('threads progress and signal through both normalize passes', async () => {
+    await expect(
+      normalizeAudio(audioReal, out('norm.m4a'), {
+        audioBitrate: '128k',
+        sampleRate: 44100,
+        onProgress: noop,
+        signal: aborted(),
+      }),
+    ).rejects.toMatchObject(isAbort);
+  }, 30_000);
+
+  it('threads progress and signal through resample', async () => {
+    await expect(
+      resampleAudio(audioReal, out('res.m4a'), {
+        channels: 1,
+        audioBitrate: '96k',
+        onProgress: noop,
+        signal: aborted(),
+      }),
+    ).rejects.toMatchObject(isAbort);
+  }, 30_000);
+
+  it('threads the signal through trimSilence', async () => {
+    await expect(
+      trimSilence(audioReal, out('trim.m4a'), { audioBitrate: '96k', signal: aborted() }),
+    ).rejects.toMatchObject(isAbort);
+  });
+
+  it('rejects an output extension no audio table knows', async () => {
+    await expect(normalizeAudio(audioReal, out('n.ogg'))).rejects.toBeInstanceOf(
+      InvalidFormatError,
+    );
   });
 });
 

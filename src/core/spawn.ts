@@ -25,6 +25,14 @@ const FPS_RE = /fps=\s*([\d.]+)/;
 const SPEED_RE = /speed=\s*([\d.]+)x/;
 const BITRATE_RE = /bitrate=\s*([\d.]+)kbits\/s/;
 
+/** Both streams captured from a process that exited successfully. */
+export interface SpawnResult {
+  /** Everything the process wrote on stdout. */
+  stdout: string;
+  /** Everything the process wrote on stderr, status lines included. */
+  stderr: string;
+}
+
 /**
  * Runs an FFmpeg/ffprobe process and resolves with its captured stdout.
  *
@@ -35,9 +43,22 @@ const BITRATE_RE = /bitrate=\s*([\d.]+)kbits\/s/;
  * - rejects with an `AbortError` DOMException when `signal` is aborted.
  */
 export function spawnFFmpeg(options: SpawnOptions): Promise<string> {
+  return spawnFFmpegCapture(options).then((result) => result.stdout);
+}
+
+/**
+ * Same run and same guarantees as {@link spawnFFmpeg}, but resolves with **both**
+ * streams instead of stdout alone.
+ *
+ * Some FFmpeg filters report on stderr and still exit 0 — `loudnorm`'s analysis
+ * pass prints its measurements there — so the error path (the only other place
+ * stderr surfaces, via {@link FFmpegError}) is never reached and the data would
+ * otherwise be dropped on the floor.
+ */
+export function spawnFFmpegCapture(options: SpawnOptions): Promise<SpawnResult> {
   const { binary, args, duration, onProgress, signal, timeout } = options;
 
-  return new Promise<string>((resolve, reject) => {
+  return new Promise<SpawnResult>((resolve, reject) => {
     // Bail out before spawning if cancellation was already requested.
     if (signal?.aborted === true) {
       reject(abortError());
@@ -78,7 +99,7 @@ export function spawnFFmpeg(options: SpawnOptions): Promise<string> {
     });
 
     child.on('close', (code) => {
-      if (code === 0) settle(() => resolve(stdout));
+      if (code === 0) settle(() => resolve({ stdout, stderr }));
       else settle(() => reject(new FFmpegError(stderr, code ?? 1)));
     });
 

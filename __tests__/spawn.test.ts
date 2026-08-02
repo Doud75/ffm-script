@@ -1,9 +1,34 @@
-import { spawnFFmpeg } from '../src/core/spawn.js';
+import { spawnFFmpeg, spawnFFmpegCapture } from '../src/core/spawn.js';
 import { FFmpegError, FFmpegTimeoutError } from '../src/errors/index.js';
 import type { Progress } from '../src/index.js';
 
 // Use the running Node binary as a stand-in for ffmpeg/ffprobe.
 const node = process.execPath;
+
+describe('spawnFFmpegCapture', () => {
+  it('resolves with both streams on a successful run', async () => {
+    // What loudnorm's analysis pass does: report on stderr, then exit 0.
+    const { stdout, stderr } = await spawnFFmpegCapture({
+      binary: node,
+      args: [
+        '-e',
+        'process.stdout.write("out"); process.stderr.write(\'{ "input_i" : "-27.05" }\')',
+      ],
+    });
+
+    expect(stdout).toBe('out');
+    expect(stderr).toBe('{ "input_i" : "-27.05" }');
+  });
+
+  it('still rejects with FFmpegError on a non-zero exit', async () => {
+    await expect(
+      spawnFFmpegCapture({
+        binary: node,
+        args: ['-e', 'process.stderr.write("boom"); process.exit(2)'],
+      }),
+    ).rejects.toBeInstanceOf(FFmpegError);
+  });
+});
 
 describe('spawnFFmpeg', () => {
   it('resolves with the captured stdout', async () => {

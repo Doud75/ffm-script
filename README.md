@@ -53,7 +53,7 @@ pnpm add ffm-script
 # or: npm install ffm-script / yarn add ffm-script
 ```
 
-> **Formats:** input MP4 / MOV / WebM / MKV (plus MP3 / AAC / WAV / FLAC / M4A for audio); video output is MP4. Audio extraction targets MP3/AAC; thumbnails target JPEG/PNG.
+> **Formats:** input MP4 / MOV / WebM / MKV (plus MP3 / AAC / WAV / FLAC / M4A for audio); video output is MP4. Audio extraction targets MP3/AAC, the audio toolkit also writes WAV/FLAC; thumbnails target JPEG/PNG.
 
 ## Usage
 
@@ -219,6 +219,71 @@ await extractAudio('input.mp4', 'output.mp3', {
   bitrate: '320k',
 });
 ```
+
+### Normalize loudness — `normalizeAudio`
+
+EBU R128 loudness normalization, run as **two FFmpeg passes**: the first measures the input, the
+second corrects it with those measurements in hand. A single-pass `loudnorm` has to ride the level
+as it goes, which audibly pumps on anything with dynamics.
+
+```ts
+import { normalizeAudio } from 'ffm-script';
+
+// Streaming/podcast target (the defaults: -16 LUFS, -1.5 dBTP, LRA 11)
+await normalizeAudio('episode.wav', 'episode.mp3', { audioBitrate: '192k' });
+
+// Broadcast target, and the video stream copied through untouched
+await normalizeAudio('input.mp4', 'output.mp4', {
+  targetLoudness: -23, // EBU R128
+  truePeak: -2,
+  loudnessRange: 7,
+  onProgress: (p) => console.log(`${p.percent.toFixed(0)}%`), // spans both passes
+});
+```
+
+Accepts video or audio input. Writing to `.mp4` / `.mov` / `.mkv` / `.webm` **copies** the video
+stream (`-c:v copy`, no generation loss); writing to `.mp3` / `.aac` / `.m4a` / `.wav` / `.flac`
+drops it. Budget roughly twice the wall time of a one-pass encode — the input is decoded twice.
+
+The output sample rate is always pinned (to the input's own rate unless you pass `sampleRate`):
+`loudnorm` resamples to 192 kHz internally, and an unpinned output would inherit that.
+
+### Resample — `resampleAudio`
+
+```ts
+import { resampleAudio } from 'ffm-script';
+
+// What a speech-to-text pipeline usually wants
+await resampleAudio('input.mp4', 'speech.wav', { sampleRate: 16000, channels: 1 });
+```
+
+At least one of `sampleRate` / `channels` is required. Same input/output formats as
+`normalizeAudio`, and the video stream travels the same way.
+
+### Trim silence — `trimSilence`
+
+```ts
+import { trimSilence } from 'ffm-script';
+
+// Cut the dead air at both ends, keeping 0.2s of lead-in
+await trimSilence('take.wav', 'tight.wav', { keepSilence: 0.2 });
+
+// Also collapse the interior gaps down to one second
+await trimSilence('take.wav', 'tight.wav', { mode: 'all', minDuration: 1, threshold: -45 });
+```
+
+| Option        | Default  | Meaning                                                                |
+| ------------- | -------- | ---------------------------------------------------------------------- |
+| `mode`        | `'both'` | `'start'` / `'end'` / `'both'` trim the edges; `'all'` also the middle |
+| `threshold`   | `-50`    | dB below which audio counts as silence                                 |
+| `minDuration` | `1`      | `'all'` only: interior silence is shortened to this many seconds       |
+| `keepSilence` | `0`      | seconds of lead-in left in place                                       |
+
+**Audio in, audio out.** A video input is rejected on purpose: cutting the audio timeline without
+cutting the picture to match would desynchronize them. There is no `onProgress` either — the output
+is shorter than the input by design, so any percentage derived from FFmpeg's timestamps would be
+wrong. Note that the `end` / `both` / `all` modes reverse the stream internally (`areverse`), which
+buffers it whole in memory: fine for an episode, not for a multi-hour recording.
 
 ### Capture a thumbnail — `thumbnail`
 
