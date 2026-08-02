@@ -4,6 +4,7 @@ export { probe } from './operations/probe.js';
 export { convert } from './operations/convert.js';
 export { trim } from './operations/trim.js';
 export { extractAudio } from './operations/extract.js';
+export { normalizeAudio, resampleAudio, trimSilence } from './operations/audio.js';
 export { thumbnail } from './operations/thumbnail.js';
 export { overlay } from './operations/overlay.js';
 export { extractSubtitles, burnSubtitles } from './operations/subtitles.js';
@@ -29,6 +30,11 @@ export type {
   ConvertOptions,
   TrimOptions,
   ExtractAudioOptions,
+  AudioOutputOptions,
+  NormalizeAudioOptions,
+  ResampleAudioOptions,
+  SilenceMode,
+  TrimSilenceOptions,
   ThumbnailOptions,
   HLSResolution,
   HLSOptions,

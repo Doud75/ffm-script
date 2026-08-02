@@ -142,6 +142,89 @@ export interface ExtractAudioOptions {
   signal?: AbortSignal;
 }
 
+/**
+ * Output-encoding options shared by the audio toolkit
+ * ({@link normalizeAudio}, {@link resampleAudio}, {@link trimSilence}).
+ */
+export interface AudioOutputOptions {
+  /**
+   * FFmpeg `-c:a` encoder. Defaults to the one the output extension implies
+   * (`libmp3lame`, `aac`, `pcm_s16le`, `flac`), or to the container's default
+   * audio codec when writing into a video file.
+   */
+  audioCodec?: string;
+  /** Target audio bitrate, e.g. `'192k'` (FFmpeg `-b:a`). */
+  audioBitrate?: string;
+}
+
+/** Options for {@link normalizeAudio}. */
+export interface NormalizeAudioOptions extends AudioOutputOptions {
+  /**
+   * Integrated loudness target in LUFS (`loudnorm` `I`). Defaults to `-16`, the
+   * usual streaming/podcast target; EBU R128 broadcast delivery wants `-23`.
+   * Accepted range: -70 to -5.
+   */
+  targetLoudness?: number;
+  /** True-peak ceiling in dBTP (`loudnorm` `TP`). Defaults to `-1.5`. Accepted range: -9 to 0. */
+  truePeak?: number;
+  /** Loudness range in LU (`loudnorm` `LRA`). Defaults to `11`. Accepted range: 1 to 50. */
+  loudnessRange?: number;
+  /**
+   * Output sample rate in Hz (FFmpeg `-ar`). Defaults to the input's own rate,
+   * or 48000 when it can't be read. It is always pinned: `loudnorm` resamples to
+   * 192 kHz internally, and an unpinned output inherits that.
+   */
+  sampleRate?: number;
+  /**
+   * Called as the two passes run, on a single combined timeline: the analysis
+   * pass fills 0–50 %, the correction pass 50–100 %.
+   */
+  onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+}
+
+/** Options for {@link resampleAudio}. At least one of `sampleRate` / `channels` is required. */
+export interface ResampleAudioOptions extends AudioOutputOptions {
+  /** Output sample rate in Hz, e.g. `48000` (FFmpeg `-ar`). Accepted range: 8000 to 192000. */
+  sampleRate?: number;
+  /** Output channel count, e.g. `1` for mono (FFmpeg `-ac`). Accepted range: 1 to 8. */
+  channels?: number;
+  /** Called whenever FFmpeg reports progress. */
+  onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+}
+
+/** Which silences {@link trimSilence} removes. */
+export type SilenceMode = 'start' | 'end' | 'both' | 'all';
+
+/** Options for {@link trimSilence}. */
+export interface TrimSilenceOptions extends AudioOutputOptions {
+  /**
+   * Which silences to remove. `'both'` (the default) strips the leading and
+   * trailing silence; `'all'` also removes every silent stretch in between.
+   */
+  mode?: SilenceMode;
+  /** Level below which audio counts as silence, in dB. Defaults to `-50`. */
+  threshold?: number;
+  /**
+   * How much silence interior stretches are shortened to, in seconds. Defaults
+   * to `1`. Only applies to `mode: 'all'`: anything shorter is left alone, so
+   * ordinary speech pauses survive while long gaps collapse to this length. The
+   * edge modes remove their silence outright, whatever its length.
+   */
+  minDuration?: number;
+  /**
+   * Silence left in place at the head of the result, in seconds. Defaults to
+   * `0`. A small value (0.1–0.3) keeps the audio from starting abruptly on the
+   * first word.
+   */
+  keepSilence?: number;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+}
+
 /** Options for {@link thumbnail}. */
 export interface ThumbnailOptions {
   /** Frame to capture, in seconds or as an `HH:MM:SS[.ms]` string. */

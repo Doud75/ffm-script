@@ -4,6 +4,27 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-08-02
+
+### Added
+
+- **Audio toolkit — `normalizeAudio`, `resampleAudio`, `trimSilence`.** `extractAudio` was the whole of the audio surface: you could pull a track out, not work on it. Anything else — matching loudness across episodes, downmixing for a speech-to-text pipeline, cutting dead air — meant dropping down to `run()` and hand-writing filter strings. Three new operations close that gap. **Purely additive**: no existing export changes signature or behaviour, and `extractAudio` is untouched.
+  - **`normalizeAudio(input, output, options?)` — EBU R128 loudness, in two passes.** The first pass measures (`loudnorm=…:print_format=json`, output discarded to `-f null -`), the second corrects with those measurements fed back plus `linear=true`. That second step is the point: a one-pass `loudnorm` has to ride the level as it goes and audibly pumps on material with dynamics, where the measured form applies one flat gain across the file. Defaults target streaming/podcast delivery — **-16 LUFS**, -1.5 dBTP, LRA 11 — and `targetLoudness`/`truePeak`/`loudnessRange` move them (EBU R128 broadcast is `-23`/`-2`/`7`).
+    - **The output sample rate is always pinned**, to the input's own rate unless `sampleRate` says otherwise. `loudnorm` resamples to 192 kHz internally and an unpinned output silently inherits it.
+    - A **silent input** measures as `-inf`, which the correction pass rejects outright; rather than fail, it falls back to one-pass dynamic mode.
+    - `onProgress` spans **both** passes as a single 0–100 % timeline (analysis 0–50 %, correction 50–100 %), so `percent`, `currentTime` and `eta` stay consistent with each other instead of resetting midway.
+  - **`resampleAudio(input, output, options?)` — first-class `-ar`/`-ac`.** At least one of `sampleRate` (8000–192000) / `channels` (1–8) is required; a call that would change nothing throws `InvalidOptionsError` instead of quietly re-encoding.
+  - **`trimSilence(input, output, options?)` — `silenceremove` without the incantation.** `mode` picks `'start'`, `'end'`, `'both'` (default) or `'all'`; `threshold` (dB, default -50), `minDuration` (seconds, default 1, `'all'` only — it is what keeps ordinary speech pauses intact) and `keepSilence` (seconds of lead-in kept, default 0) tune it. The edge modes reverse the stream around the filter, because `silenceremove` only ever trims from a stream's head; `'all'` combines `start_periods=1` with `stop_periods=-1`, since the latter alone never touches what precedes the first non-silent sample.
+  - **Video travels differently per operation.** `normalizeAudio` and `resampleAudio` accept video or audio input and **copy** the video stream (`-c:v copy`, no generation loss) into a video container, or drop it for an audio-only output; a codec the target container can't carry (h264 into WebM) is rejected up front rather than surfacing as an opaque FFmpeg failure. `trimSilence` is **audio-only on both sides** — shortening the audio timeline without cutting the picture to match would desynchronise them, so a video input is refused. It also has **no `onProgress`**: its output is shorter than its input by design, so a percentage read off FFmpeg's timestamps would be wrong, and no progress beats lying progress.
+  - Inputs with no audio stream at all are rejected with `InvalidFormatError` rather than left to fail inside FFmpeg.
+- **New pure modules `src/core/audio.ts`** (`AUDIO_ENCODERS`, `resolveAudioEncoder`, `isAudioOutput`, `assertAudioOutput`, `buildSilenceRemoveFilter`) **and `src/core/loudnorm.ts`** (`buildLoudnormFilter`, `parseLoudnormStats`, `offsetProgress`, `DEFAULT_LOUDNORM_TARGETS`). `resolveAudioEncoder` reuses the container matrix in `core/container.ts` for video outputs, so the audio toolkit inherits the same codec-compatibility rules as `convert`.
+- New types exported: `AudioOutputOptions`, `NormalizeAudioOptions`, `ResampleAudioOptions`, `TrimSilenceOptions`, `SilenceMode`.
+- `examples/audio.ts`, registered in the runner (`pnpm examples audio`) — it generates its own silence-padded source via `run()`, since the committed fixture is a continuous tone.
+
+### Changed
+
+- **`spawnFFmpeg` gained a sibling, `spawnFFmpegCapture`**, resolving with `{ stdout, stderr }` instead of stdout alone; `spawnFFmpeg` is now a thin wrapper over it. `loudnorm`'s analysis pass prints its measurements on **stderr** and exits **0**, so the only existing route to stderr (`FFmpegError`) is never reached and the data was being dropped. Internal, and every existing caller keeps its `Promise<string>`.
+
 ## [1.4.0] - 2026-07-30
 
 ### Added
@@ -196,6 +217,7 @@ Initial release. Guaranteed format: MP4 in and out.
 - Input validation (file existence, extension, timestamps) before any FFmpeg call.
 - Dual ESM + CJS builds with TypeScript declarations.
 
+[1.5.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.5.0
 [1.4.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.4.0
 [1.3.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.3.0
 [1.2.0]: https://github.com/Doud75/ffm-script/releases/tag/v1.2.0
