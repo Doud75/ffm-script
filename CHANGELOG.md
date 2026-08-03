@@ -4,6 +4,22 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres
 to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-08-03
+
+### Added
+
+- **Scrubbing storyboards — `toSprites(input, outputDir, options?)`.** `thumbnail` captured one frame at one timestamp; nothing covered the preview strip a player shows when the viewer hovers the progress bar. `toSprites` samples the whole input at a fixed `interval`, packs the thumbnails into `columns`×`rows` sprite sheets, and writes the WebVTT that maps every moment of the timeline to its tile — the companion piece to `toHLS`. Video input only (MP4/MOV/WebM/MKV). **Purely additive**: one new export, no existing signature or behaviour touched.
+  - Options: `interval` (seconds between thumbnails, default 10), `width` (thumbnail width in px, default 160), `columns`/`rows` (grid per sheet, default 5×5), `format` (`'jpg'` default, `'png'`, `'webp'`), plus the usual `onProgress`/`signal`.
+  - Output names are **fixed**, like the HLS playlists: `sprite_000.<format>`, `sprite_001.<format>`, … (a new sheet every `columns * rows` thumbnails) and `storyboard.vtt`, all inside `outputDir`. Cues reference the sheets by **relative** URL with an `#xywh=x,y,w,h` media fragment, so serving the directory as-is is enough — video.js, hls.js, Plyr and JW all read this shape.
+  - **The tile height is computed, not delegated.** Everywhere else the library hands `-2` to FFmpeg's `scale` and lets it derive the missing dimension; that is impossible here, because the WebVTT has to state the exact pixel geometry _before_ FFmpeg runs — a pixel of drift skews the preview across the whole timeline. The height is derived from the probed source instead, swapping the dimensions for a 90°/270° rotated input (which is how it is displayed) and rounding to an even number.
+  - **`-start_number 0` is forced.** The `image2` muxer numbers from 1 by default, which would have shifted every sheet file one step away from the indices the cues compute.
+  - **The cue count is capped by the sheets actually written.** `fps=1/interval` does not guarantee the thumbnail count to the frame — it depends on where the source's last frame falls — so the planned count is trimmed against the files on disk after the run, and the VTT can never point at a sheet that is not there. Unused cells of the final sheet simply stay unreferenced.
+  - A grid whose sheet would exceed **16384px** on either edge is rejected with `InvalidOptionsError`. That is well under the encoders' own ceiling (mjpeg stops at 65500), but past it browsers and mobile decoders start refusing the image, and a storyboard nobody can display is worse than a clear error.
+  - An input with no video stream is rejected with `InvalidFormatError` rather than left to fail inside FFmpeg.
+- **New pure module `src/core/sprites.ts`** (`resolveTileHeight`, `buildSpriteFilter`, `planSpriteCues`, `formatVttTimestamp`, `buildVtt`, `spriteSheetName`, `spriteSheetPattern`) — geometry, cue planning and VTT rendering, all unit-tested without FFmpeg.
+- New types exported: `SpriteOptions`, `SpriteFormat`.
+- `examples/sprites.ts`, registered in the runner (`pnpm examples sprites`).
+
 ## [1.5.0] - 2026-08-02
 
 ### Added

@@ -1,6 +1,6 @@
 ---
 name: ffm-script
-description: Use when writing, reviewing, or debugging Node.js/TypeScript code that uses the "ffm-script" npm package (a dependency-free FFmpeg CLI wrapper). Provides exact public API signatures, format/output constraints, hardware-acceleration and quality-preset mappings, the typed error hierarchy, and copy-paste recipes for probe, convert, parallelConvert, trim, extractAudio, normalizeAudio, resampleAudio, trimSilence, thumbnail, toHLS, audioToHLS, overlay, subtitles, toAnimation, concat, setMetadata, run/runStream, listHwaccels, and the chainable API. Use it instead of guessing signatures or option names.
+description: Use when writing, reviewing, or debugging Node.js/TypeScript code that uses the "ffm-script" npm package (a dependency-free FFmpeg CLI wrapper). Provides exact public API signatures, format/output constraints, hardware-acceleration and quality-preset mappings, the typed error hierarchy, and copy-paste recipes for probe, convert, parallelConvert, trim, extractAudio, normalizeAudio, resampleAudio, trimSilence, thumbnail, toHLS, audioToHLS, toSprites, overlay, subtitles, toAnimation, concat, setMetadata, run/runStream, listHwaccels, and the chainable API. Use it instead of guessing signatures or option names.
 ---
 
 # ffm-script
@@ -286,6 +286,19 @@ audioToHLS(input: string, outputDir: string, options?: {   // options OPTIONAL
 
 Audio-only counterpart of `toHLS` (bitrate ladder, no scaling). Audio input only (MP3/AAC/WAV/FLAC/M4A). Writes `outputDir/master.m3u8` + one folder per bitrate (named by the bitrate, e.g. `128k/`) — a master is written even for a single bitrate.
 
+```ts
+toSprites(input: string, outputDir: string, options?: {   // options OPTIONAL
+  interval?: number   // seconds between thumbnails; default 10
+  width?: number      // thumbnail width in px, height keeps the ratio; default 160
+  columns?: number    // thumbnails per sheet row; default 5
+  rows?: number       // rows per sheet; default 5
+  format?: 'jpg' | 'png' | 'webp'   // default 'jpg'
+  onProgress?, signal?
+}): Promise<void>
+```
+
+Scrubbing storyboard for a player's progress-bar preview — the companion to `toHLS`. Video input only. Writes fixed names into `outputDir`: `sprite_000.<format>`, `sprite_001.<format>`, … (a new sheet every `columns * rows` thumbnails) plus `storyboard.vtt`, whose cues point at the sheets by **relative** URL with an `#xywh=x,y,w,h` media fragment — serve the directory as-is. Thumbnail height is computed from the source (rotation-aware) so the fragments are pixel-exact. Rejects a grid whose sheet would exceed 16384px on either edge (`InvalidOptionsError`).
+
 ### Escape hatches
 
 ```ts
@@ -389,6 +402,7 @@ import {
   thumbnail,
   toHLS,
   audioToHLS,
+  toSprites,
   overlay,
   burnSubtitles,
   toAnimation,
@@ -468,6 +482,10 @@ await toHLS('in.mp4', './hls/', {
 // HLS ladder (audio-only): bitrate ladder, master.m3u8 + one folder per bitrate
 await audioToHLS('podcast.m4a', './audio-hls/', { bitrates: ['128k', '64k'], segmentType: 'fmp4' });
 
+// Scrubbing storyboard next to the HLS output: sprite sheets + storyboard.vtt
+await toSprites('in.mp4', './hls/', { interval: 5, width: 160 });
+// player side: point the thumbnail track at ./hls/storyboard.vtt
+
 // Watermark, burn subtitles
 await overlay('in.mp4', 'out.mp4', {
   watermark: 'logo.png',
@@ -520,6 +538,9 @@ await runStream(
 - Don't hand `trimSilence` a video file: it's rejected on purpose. Cutting audio without cutting the picture desynchronises them.
 - `trimSilence`'s `end`/`both`/`all` modes use `areverse`, which buffers the **whole** stream in memory — fine for a podcast episode, not for a multi-hour recording.
 - `minDuration` only bites in `mode: 'all'`; the edge modes remove their silence whatever its length.
+- `toSprites`' default `interval: 10` samples one thumbnail per 10s — on a clip shorter than that you get a single tile. Lower `interval` for short inputs.
+- Don't move a `toSprites` sheet away from its `storyboard.vtt`: the cue URLs are relative to the VTT.
+- `toSprites` output names are fixed (`sprite_%03d.<format>`, `storyboard.vtt`) — like the HLS playlists, there is no naming option. Point it at a dedicated directory.
 - `run`/`runStream` don't auto-probe — pass `duration` if you want a progress percentage.
 - For piped I/O, a plain MP4 won't work (no seeking) — use MPEG-TS, MKV, or fragmented MP4.
 - Output extension determines the container; there is no format option.

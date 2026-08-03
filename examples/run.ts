@@ -15,6 +15,7 @@ import metadata from './metadata.js';
 import concat from './concat.js';
 import hls from './hls.js';
 import audioHls from './audio-hls.js';
+import sprites from './sprites.js';
 import chain from './chain.js';
 import filters from './filters.js';
 import parallel from './parallel.js';
@@ -44,6 +45,7 @@ const examples: Example[] = [
   { name: 'concat', run: concat },
   { name: 'hls', run: hls },
   { name: 'audio-hls', run: audioHls },
+  { name: 'sprites', run: sprites },
   { name: 'chain', run: chain },
   { name: 'filters', run: filters },
   { name: 'parallel', run: parallel },

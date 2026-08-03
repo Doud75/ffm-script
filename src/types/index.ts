@@ -287,6 +287,30 @@ export interface AudioHLSOptions {
   signal?: AbortSignal;
 }
 
+/** Image format of the sprite sheets written by {@link toSprites}. */
+export type SpriteFormat = 'jpg' | 'png' | 'webp';
+
+/** Options for {@link toSprites}. */
+export interface SpriteOptions {
+  /** Seconds between two thumbnails. Defaults to `10`. */
+  interval?: number;
+  /** Thumbnail width in pixels; height preserves the source aspect ratio. Defaults to `160`. */
+  width?: number;
+  /** Thumbnails per sheet row. Defaults to `5`. */
+  columns?: number;
+  /** Thumbnail rows per sheet. Defaults to `5`. */
+  rows?: number;
+  /**
+   * Sheet image format. `'jpg'` (the default, smallest) or `'png'` / `'webp'`.
+   * Also the extension of the sheet files and of the URLs in the WebVTT.
+   */
+  format?: SpriteFormat;
+  /** Called with progress updates as the sheets are generated. */
+  onProgress?: (progress: Progress) => void;
+  /** Aborts the operation; the returned promise rejects with an `AbortError`. */
+  signal?: AbortSignal;
+}
+
 /** A keyframe (sync sample) position, in seconds from the start. */
 export interface Keyframe {
   timestamp: number;
