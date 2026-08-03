@@ -53,7 +53,7 @@ pnpm add ffm-script
 # or: npm install ffm-script / yarn add ffm-script
 ```
 
-> **Formats:** input MP4 / MOV / WebM / MKV (plus MP3 / AAC / WAV / FLAC / M4A for audio); video output is MP4. Audio extraction targets MP3/AAC, the audio toolkit also writes WAV/FLAC; thumbnails target JPEG/PNG.
+> **Formats:** input MP4 / MOV / WebM / MKV (plus MP3 / AAC / WAV / FLAC / M4A for audio); video output is MP4. Audio extraction targets MP3/AAC, the audio toolkit also writes WAV/FLAC; thumbnails target JPEG/PNG, storyboard sprite sheets JPEG/PNG/WebP.
 
 ## Usage
 
@@ -331,6 +331,47 @@ await audioToHLS('podcast.wav', './output/', {
 ```
 
 A `master.m3u8` is written even for a single bitrate, so players always target the same URL. Each variant folder is named after its bitrate.
+
+### Scrubbing storyboard — `toSprites`
+
+The preview that appears when a viewer hovers the progress bar. Samples thumbnails at a fixed interval, packs them into sprite sheets, and writes the WebVTT that maps each moment of the timeline to its tile — the natural companion to `toHLS`.
+
+```ts
+import { toSprites } from 'ffm-script';
+
+await toSprites('input.mp4', './output/', {
+  interval: 10, // seconds between thumbnails (default 10)
+  width: 160, // thumbnail width; height keeps the aspect ratio (default 160)
+  columns: 5, // thumbnails per row (default 5)
+  rows: 5, // rows per sheet (default 5)
+  format: 'jpg', // 'jpg' (default) | 'png' | 'webp'
+});
+// → output/sprite_000.jpg, output/sprite_001.jpg, … + output/storyboard.vtt
+```
+
+| Option     | Type                       | Default | Notes                                                                  |
+| ---------- | -------------------------- | ------- | ---------------------------------------------------------------------- |
+| `interval` | `number`                   | `10`    | Seconds between thumbnails. Lower it for short clips.                  |
+| `width`    | `number`                   | `160`   | Thumbnail width in px; height is derived from the source.              |
+| `columns`  | `number`                   | `5`     | Thumbnails per sheet row.                                              |
+| `rows`     | `number`                   | `5`     | Rows per sheet — a new sheet starts every `columns * rows` thumbnails. |
+| `format`   | `'jpg' \| 'png' \| 'webp'` | `'jpg'` | Sheet image format, and the extension used in the VTT URLs.            |
+
+The generated `storyboard.vtt` points at the sheets by **relative** URL with an [`#xywh=`](https://www.w3.org/TR/media-frags/) media fragment, so serving the output directory as-is is enough:
+
+```
+WEBVTT
+
+00:00:00.000 --> 00:00:10.000
+sprite_000.jpg#xywh=0,0,160,90
+
+00:00:10.000 --> 00:00:20.000
+sprite_000.jpg#xywh=160,0,160,90
+```
+
+Point your player's thumbnail track at that file — video.js, hls.js, Plyr and JW all read this format.
+
+Two details worth knowing: the thumbnail **height is computed from the source** (rotation included) rather than left to FFmpeg, so the `#xywh=` fragments are pixel-exact; and the file names are fixed, like the HLS playlists — give it a dedicated directory. A grid whose sheet would exceed 16384px on either edge is rejected with `InvalidOptionsError`, since browsers and mobile decoders refuse images that large.
 
 ### Chainable API — `ffmscript`
 

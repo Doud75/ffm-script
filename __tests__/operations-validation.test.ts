@@ -9,6 +9,7 @@ import { trim } from '../src/operations/trim.js';
 import { convert } from '../src/operations/convert.js';
 import { toAnimation } from '../src/operations/animation.js';
 import { toHLS, audioToHLS } from '../src/operations/hls.js';
+import { toSprites } from '../src/operations/sprites.js';
 import { overlay } from '../src/operations/overlay.js';
 import { setMetadata } from '../src/operations/metadata.js';
 import { extractSubtitles, burnSubtitles } from '../src/operations/subtitles.js';
@@ -16,6 +17,7 @@ import { concat } from '../src/operations/concat.js';
 import { run, runStream } from '../src/operations/run.js';
 import { ffmscript } from '../src/operations/chain.js';
 import { InvalidFormatError, InvalidOptionsError } from '../src/errors/index.js';
+import type { SpriteFormat } from '../src/types/index.js';
 import { SAMPLE } from './helpers.js';
 
 // These tests drive the *non-FFmpeg* code paths: input validation and option
@@ -208,6 +210,56 @@ describe('audioToHLS validation', () => {
         onProgress: noop,
         signal: aborted(),
       }),
+    ).rejects.toMatchObject(isAbort);
+  });
+});
+
+describe('toSprites validation', () => {
+  it('rejects a non-positive or non-finite interval', async () => {
+    await expect(toSprites(SAMPLE, out('sp-i0'), { interval: 0 })).rejects.toBeInstanceOf(
+      InvalidOptionsError,
+    );
+    await expect(
+      toSprites(SAMPLE, out('sp-inf'), { interval: Number.POSITIVE_INFINITY }),
+    ).rejects.toBeInstanceOf(InvalidOptionsError);
+  });
+
+  it('rejects a grid or tile size that is not a positive integer', async () => {
+    await expect(toSprites(SAMPLE, out('sp-w'), { width: 0 })).rejects.toBeInstanceOf(
+      InvalidOptionsError,
+    );
+    await expect(toSprites(SAMPLE, out('sp-c'), { columns: 1.5 })).rejects.toBeInstanceOf(
+      InvalidOptionsError,
+    );
+    await expect(toSprites(SAMPLE, out('sp-r'), { rows: -2 })).rejects.toBeInstanceOf(
+      InvalidOptionsError,
+    );
+  });
+
+  it('rejects an unknown image format', async () => {
+    await expect(
+      toSprites(SAMPLE, out('sp-fmt'), { format: 'bmp' as SpriteFormat }),
+    ).rejects.toBeInstanceOf(InvalidOptionsError);
+  });
+
+  it('rejects a grid that would exceed the decodable sheet size', async () => {
+    // 200 columns of 160px tiles = 32000px wide, past the 16384px ceiling.
+    await expect(toSprites(SAMPLE, out('sp-wide'), { columns: 200 })).rejects.toBeInstanceOf(
+      InvalidOptionsError,
+    );
+    // Same on the other edge: 400 rows of 90px tiles = 36000px tall.
+    await expect(toSprites(SAMPLE, out('sp-tall'), { rows: 400 })).rejects.toBeInstanceOf(
+      InvalidOptionsError,
+    );
+  });
+
+  it('rejects an audio input (video-only)', async () => {
+    await expect(toSprites(audioStub, out('sp-audio'))).rejects.toBeInstanceOf(InvalidFormatError);
+  });
+
+  it('probes, creates the dir, and threads progress/signal', async () => {
+    await expect(
+      toSprites(SAMPLE, out('sp'), { interval: 2, onProgress: noop, signal: aborted() }),
     ).rejects.toMatchObject(isAbort);
   });
 });

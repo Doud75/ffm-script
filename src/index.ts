@@ -13,6 +13,7 @@ export { setMetadata } from './operations/metadata.js';
 export { run, runStream } from './operations/run.js';
 export { concat } from './operations/concat.js';
 export { toHLS, audioToHLS } from './operations/hls.js';
+export { toSprites } from './operations/sprites.js';
 export { ffmscript, FfmScriptChain } from './operations/chain.js';
 export type { SaveOptions } from './operations/chain.js';
 export { parallelConvert } from './operations/parallel.js';
@@ -40,6 +41,8 @@ export type {
   HLSOptions,
   AudioHLSOptions,
   SegmentType,
+  SpriteFormat,
+  SpriteOptions,
   Keyframe,
   ParallelConvertOptions,
   BatchOptions,
